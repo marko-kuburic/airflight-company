@@ -1,0 +1,71 @@
+# Git
+.git
+.gitignore
+README.md
+README-Docker.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# Environment files
+.env
+.env.*
+docker.env
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Runtime
+target/
+!target/classes/
+!target/generated-sources/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+src/test/
+
+# Build artifacts
+*.jar
+*.war
+*.ear
+*.class
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# Node modules (if any)
+node_modules/
+
+# Coverage reports
+coverage/
+
+# Backup files
+*.bak
+*.backup
