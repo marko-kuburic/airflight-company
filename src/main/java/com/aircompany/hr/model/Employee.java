@@ -10,8 +10,8 @@ import java.util.List;
 @DiscriminatorValue("EMPLOYEE")
 public class Employee extends User {
     
-    @Column(name = "`function`")
-    private String function;
+    @Column(name = "job_function")
+    private String jobFunction;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "crew_position")
@@ -58,12 +58,12 @@ public class Employee extends User {
     }
     
     // Getters and Setters
-    public String getFunction() {
-        return function;
+    public String getJobFunction() {
+        return jobFunction;
     }
     
-    public void setFunction(String function) {
-        this.function = function;
+    public void setJobFunction(String jobFunction) {
+        this.jobFunction = jobFunction;
     }
     
     public CrewPosition getCrewPosition() {
