@@ -1,6 +1,7 @@
 package com.aircompany.flight.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -21,6 +22,10 @@ public class Flight {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    @NotBlank
+    @Column(name = "flight_number", nullable = false, unique = true)
+    private String flightNumber;
     
     @NotNull
     @Column(name = "dep_time", nullable = false)
@@ -46,9 +51,8 @@ public class Flight {
     @JoinColumn(name = "aircraft_id")
     private Aircraft aircraft;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "offer_id")
-    private Offer offer;
+    @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Offer> offers = new ArrayList<>();
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")
@@ -78,6 +82,14 @@ public class Flight {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public String getFlightNumber() {
+        return flightNumber;
+    }
+    
+    public void setFlightNumber(String flightNumber) {
+        this.flightNumber = flightNumber;
     }
     
     public LocalDateTime getDepTime() {
@@ -128,12 +140,12 @@ public class Flight {
         this.aircraft = aircraft;
     }
     
-    public Offer getOffer() {
-        return offer;
+    public List<Offer> getOffers() {
+        return offers;
     }
     
-    public void setOffer(Offer offer) {
-        this.offer = offer;
+    public void setOffers(List<Offer> offers) {
+        this.offers = offers;
     }
     
     public Route getRoute() {

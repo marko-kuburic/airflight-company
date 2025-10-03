@@ -1,11 +1,9 @@
 package com.aircompany.sales.service;
 
 import com.aircompany.flight.model.Flight;
-import com.aircompany.sales.model.Offer;
 import com.aircompany.sales.model.Reservation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.persistence.EntityManager;
@@ -16,7 +14,6 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.DayOfWeek;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 
 /**
  * Service for dynamic pricing based on demand, season, and class
@@ -54,8 +51,9 @@ public class DynamicPricingService {
         // Base price calculation - simplified version
         // In real implementation, this would come from fare tables based on route distance, aircraft type, etc.
         
-        if (flight.getOffer() != null && flight.getOffer().getBasePrice() != null) {
-            return flight.getOffer().getBasePrice();
+        if (flight.getOffers() != null && !flight.getOffers().isEmpty()) {
+            // Return the base price of the first offer (typically economy)
+            return flight.getOffers().get(0).getBasePrice();
         }
         
         // Fallback: calculate based on route distance (simplified)

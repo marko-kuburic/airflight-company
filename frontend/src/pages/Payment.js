@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { FlightSummaryCard } from '../components/FlightSummaryCard';
 import { PaymentMethodSelector } from '../components/PaymentMethodSelector';
+import { bookingAPI } from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function Payment() {
   const [paymentData, setPaymentData] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
   
-  // Sample flight data - would come from props or state in real app
-  const selectedFlight = {
-    flightNumber: 'FD-801',
+  // Get booking data from route state
+  const { selectedFlight, passengerData, selectedSeat } = location.state || {};
+  
+  // Fallback to sample data if no state
+  const flightData = selectedFlight || {
+    flightNumber: 'AC101',
     route: 'BEG → CDG',
     departure: '08:10',
-    arrival: '10:35',
+    arrival: '10:40',
     class: 'Economy',
-    fareIncludes: 'Offer: 09:35'
+    fareIncludes: 'Offer: 24h',
+    price: '€250'
   };
 
   const handlePaymentChange = (data) => {
@@ -21,13 +31,49 @@ export default function Payment() {
   };
 
   const handleBack = () => {
-    // Navigate back to booking details
-    console.log('Back to booking details');
+    navigate('/booking', { state: { selectedFlight } });
   };
 
-  const handlePay = () => {
-    // Process payment
-    console.log('Processing payment', { paymentData });
+  const handlePay = async () => {
+    if (!paymentData) {
+      toast.error('Please select a payment method');
+      return;
+    }
+
+    if (!passengerData) {
+      toast.error('Missing passenger information');
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      // Create booking/reservation
+      const reservationData = {
+        flightId: flightData.id,
+        passengerData,
+        selectedSeat,
+        paymentData
+      };
+
+      // For now, simulate successful payment
+      setTimeout(() => {
+        toast.success('Payment successful! Booking confirmed.');
+        navigate('/booking-confirmed', {
+          state: {
+            reservationNumber: 'RES' + Date.now(),
+            flightData,
+            passengerData,
+            selectedSeat
+          }
+        });
+      }, 2000);
+
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error('Payment failed. Please try again.');
+      setProcessing(false);
+    }
   };
 
   const pageStyle = {
@@ -120,11 +166,16 @@ export default function Payment() {
           <div>
             <div style={selectedFlightStyle}>Selected</div>
             <div style={flightDetailsStyle}>
-              {selectedFlight.flightNumber} • {selectedFlight.route} • {selectedFlight.departure}/{selectedFlight.arrival} • {selectedFlight.class}
+              {flightData.flightNumber} • {flightData.route} • {flightData.departure}/{flightData.arrival} • {flightData.class}
             </div>
+            {selectedSeat && (
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Seat: {selectedSeat}
+              </div>
+            )}
           </div>
           <div style={offerBadgeStyle}>
-            Offer: 09:35
+            {flightData.price || '€250'}
           </div>
         </div>
         
@@ -134,18 +185,24 @@ export default function Payment() {
           <button 
             style={backButtonStyle}
             onClick={handleBack}
+            disabled={processing}
             onMouseEnter={(e) => e.target.style.backgroundColor = '#f9fafb'}
             onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
           >
             Back
           </button>
           <button 
-            style={payButtonStyle}
+            style={{
+              ...payButtonStyle,
+              backgroundColor: processing ? '#9ca3af' : '#10b981',
+              cursor: processing ? 'not-allowed' : 'pointer'
+            }}
             onClick={handlePay}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+            disabled={processing}
+            onMouseEnter={(e) => !processing && (e.target.style.backgroundColor = '#059669')}
+            onMouseLeave={(e) => !processing && (e.target.style.backgroundColor = '#10b981')}
           >
-            Pay
+            {processing ? 'Processing...' : 'Pay'}
           </button>
         </div>
       </div>

@@ -10,6 +10,7 @@ import com.aircompany.sales.model.Reservation;
 import com.aircompany.sales.model.Passenger;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "tickets")
@@ -123,9 +124,14 @@ public class Ticket {
     }
     
     // Helper method to get fare through reservation
+    // Since an offer can now have multiple fares, we need to specify which fare we want
+    // For now, we'll return the first fare (could be enhanced to select by cabin class)
     public Fare getFare() {
-        return reservation != null && reservation.getOffer() != null ? 
-               reservation.getOffer().getFare() : null;
+        if (reservation != null && reservation.getOffer() != null) {
+            List<Fare> fares = reservation.getOffer().getFares();
+            return fares != null && !fares.isEmpty() ? fares.get(0) : null;
+        }
+        return null;
     }
     
     // Nested Enum

@@ -60,9 +60,12 @@ export const authAPI = {
 };
 
 export const flightAPI = {
-  // Flight search
-  searchFlights: (params) => api.get('/flights/search', { params }),
+  // Flight search - using test endpoint for now
+  searchFlights: (params) => api.get('/test/flights', { params }),
   getFlightById: (id) => api.get(`/flights/${id}`),
+  
+  // Airports
+  getAirports: () => api.get('/flights/airports'),
   
   // Offers
   getOffers: () => api.get('/offers'),
@@ -77,13 +80,13 @@ export const flightAPI = {
 };
 
 export const bookingAPI = {
-  // Reservations
+  // Reservations - using test endpoint for now
   createReservation: (data) => api.post('/bookings/reservations', data),
   getReservation: (id) => api.get(`/bookings/reservations/${id}`),
   getReservationByNumber: (reservationNumber) => 
     api.get(`/bookings/reservations/number/${reservationNumber}`),
   getReservationsByCustomer: (customerId) => 
-    api.get(`/bookings/reservations/customer/${customerId}`),
+    api.get(`/test/reservations/${customerId}`),
   cancelReservation: (id, reason) => 
     api.post(`/bookings/reservations/${id}/cancel`, null, { params: { reason } }),
   

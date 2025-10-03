@@ -1,44 +1,71 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { bookingAPI } from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function MyTickets() {
   const navigate = useNavigate();
-  // This would come from API in real app
-  const tickets = [
-    {
-      id: 'TCK-10231',
-      flightNumber: 'FD-801',
-      route: 'BEG → CDG',
-      date: '2025-09-10',
-      class: 'Economy',
-      status: 'Created'
-    },
-    {
-      id: 'TCK-10218',
-      flightNumber: 'FD-815',
-      route: 'BEG → CDG',
-      date: '2025-08-28',
-      class: 'Business',
-      status: 'Confirmed'
-    },
-    {
-      id: 'TCK-10190',
-      flightNumber: 'FD-829',
-      route: 'BEG → CDG',
-      date: '2025-08-12',
-      class: 'Economy',
-      status: 'Cancelled'
-    },
-    {
-      id: 'TCK-10077',
-      flightNumber: 'FD-702',
-      route: 'BEG → FRA',
-      date: '2025-07-02',
-      class: 'Economy',
-      status: 'Used'
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTickets();
+  }, []);
+
+  const loadTickets = async () => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      if (userData.id) {
+        const response = await bookingAPI.getReservationsByCustomer(userData.id);
+        // Transform reservations to ticket format
+        const ticketData = response.data.map(reservation => ({
+          id: reservation.reservationNumber || `TCK-${reservation.id}`,
+          flightNumber: reservation.flightNumber,
+          route: reservation.route,
+          date: reservation.date,
+          class: 'Economy',
+          status: reservation.status
+        }));
+        setTickets(ticketData);
+      } else {
+        // Use sample data if no user logged in
+        setTickets([
+          {
+            id: 'TCK-10231',
+            flightNumber: 'AC101',
+            route: 'BEG → CDG',
+            date: '2025-10-15',
+            class: 'Economy',
+            status: 'Confirmed'
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error loading tickets:', error);
+      // Use sample data as fallback
+      setTickets([
+        {
+          id: 'TCK-10231',
+          flightNumber: 'AC101',
+          route: 'BEG → CDG',
+          date: '2025-10-15',
+          class: 'Economy',
+          status: 'Confirmed'
+        },
+        {
+          id: 'TCK-10218',
+          flightNumber: 'AC102',
+          route: 'BEG → CDG',
+          date: '2025-08-28',
+          class: 'Business',
+          status: 'Confirmed'
+        }
+      ]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const pageStyle = {
     padding: '24px',
@@ -251,7 +278,11 @@ export default function MyTickets() {
       <div style={pageStyle}>
         <h1 style={headerStyle}>My Tickets</h1>
         
-        {tickets.length > 0 ? (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <p style={{ color: '#6b7280', fontFamily: 'Inter, sans-serif' }}>Loading tickets...</p>
+          </div>
+        ) : tickets.length > 0 ? (
           <div style={tableContainerStyle}>
             {/* Table Header */}
             <div style={tableHeaderStyle}>

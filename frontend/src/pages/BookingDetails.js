@@ -1,34 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { FlightSummaryCard } from '../components/FlightSummaryCard';
 import { PassengerDetailsForm } from '../components/PassengerDetailsForm';
 import { SeatSelection } from '../components/SeatSelection';
+import toast from 'react-hot-toast';
 
 export default function BookingDetails() {
   const [passengerData, setPassengerData] = useState(null);
+  const [selectedSeat, setSelectedSeat] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
   
-  // Sample flight data - would come from props or state in real app
-  const selectedFlight = {
-    flightNumber: 'FD-801',
+  // Get flight data from route state or use sample data
+  const selectedFlight = location.state?.selectedFlight || {
+    flightNumber: 'AC101',
     route: 'BEG → CDG',
     departure: '08:10',
-    arrival: '10:35',
+    arrival: '10:40',
     class: 'Economy',
-    fareIncludes: '1 carry-on + 1 checked'
+    fareIncludes: '1 carry-on + 1 checked',
+    price: '€250'
   };
 
   const handlePassengerFormChange = (data) => {
     setPassengerData(data);
   };
 
+  const handleSeatSelection = (seatNumber) => {
+    setSelectedSeat(seatNumber);
+  };
+
   const handleBackToResults = () => {
-    // Navigate back to search results
-    console.log('Back to results');
+    navigate('/search');
   };
 
   const handleContinue = () => {
-    // Proceed to payment
-    console.log('Continue to payment', { passengerData });
+    if (!passengerData) {
+      toast.error('Please fill in passenger details');
+      return;
+    }
+
+    if (!selectedSeat) {
+      toast.error('Please select a seat');
+      return;
+    }
+
+    // Navigate to payment with all booking data
+    navigate('/payment', { 
+      state: { 
+        selectedFlight,
+        passengerData,
+        selectedSeat
+      } 
+    });
   };
 
   const pageStyle = {
@@ -115,7 +140,7 @@ export default function BookingDetails() {
           
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Seat Selection</h2>
-            <SeatSelection />
+            <SeatSelection onSeatSelect={handleSeatSelection} />
           </div>
         </div>
 

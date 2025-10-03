@@ -5,7 +5,7 @@ const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
 };
 
-export function SeatSelection() {
+export function SeatSelection({ onSeatSelect }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
 
   const rows = 6;
@@ -75,7 +75,11 @@ export function SeatSelection() {
 
   const handleSeatClick = (seatId, status) => {
     if (status !== "unavailable") {
-      setSelectedSeat(selectedSeat === seatId ? null : seatId);
+      const newSelectedSeat = selectedSeat === seatId ? null : seatId;
+      setSelectedSeat(newSelectedSeat);
+      if (onSeatSelect) {
+        onSeatSelect(newSelectedSeat);
+      }
     }
   };
 

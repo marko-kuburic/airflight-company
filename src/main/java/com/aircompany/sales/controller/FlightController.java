@@ -124,6 +124,20 @@ public class FlightController {
         }
     }
     
+    /**
+     * Get all airports for dropdown search
+     */
+    @GetMapping("/airports")
+    public ResponseEntity<?> getAirports() {
+        try {
+            List<Map<String, String>> airports = flightService.getAllAirports();
+            return ResponseEntity.ok(airports);
+        } catch (Exception e) {
+            logger.error("Error getting airports: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error getting airports: " + e.getMessage()));
+        }
+    }
+    
     private Map<String, String> createErrorResponse(String message) {
         Map<String, String> error = new HashMap<>();
         error.put("error", message);

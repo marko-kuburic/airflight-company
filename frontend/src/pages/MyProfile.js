@@ -3,96 +3,98 @@ import { Layout } from '../components/Layout';
 import { ProfileForm } from '../components/ProfileForm';
 import { SavedPaymentMethods } from '../components/SavedPaymentMethods';
 import { RecentPurchases } from '../components/RecentPurchases';
+import { authAPI, bookingAPI } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function MyProfile() {
   const [profileData, setProfileData] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [recentPurchases, setRecentPurchases] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Mock data - in real app this would come from API
-  const mockProfileData = {
-    firstName: 'Ana',
-    lastName: 'Petrović',
-    email: 'ana@example.com',
-    phone: '+381 64 123 4567',
-    userId: 'user-123'
-  };
-
-  const mockPaymentMethods = [
-    {
-      id: 'card-1',
-      type: 'Visa',
-      lastFour: '1234',
-      expiry: '07/27'
-    }
-  ];
-
-  const mockRecentPurchases = [
-    {
-      ticketNumber: 'TCK-10218',
-      status: 'Confirmed',
-      flightNumber: 'FD-815',
-      date: '2025-08-28'
-    },
-    {
-      ticketNumber: 'TCK-10190',
-      status: 'Cancelled',
-      flightNumber: 'FD-829',
-      date: '2025-08-12'
-    }
-  ];
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // In real app, fetch user profile data from API
-    const fetchProfileData = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API calls
-        // const [profileResponse, paymentsResponse, purchasesResponse] = await Promise.all([
-        //   fetch('/api/user/profile'),
-        //   fetch('/api/user/payment-methods'),
-        //   fetch('/api/user/recent-purchases')
-        // ]);
-        
-        // For now, use mock data
-        setTimeout(() => {
-          setProfileData(mockProfileData);
-          setPaymentMethods(mockPaymentMethods);
-          setRecentPurchases(mockRecentPurchases);
-          setIsLoading(false);
-        }, 500);
-      } catch (error) {
-        console.error('Error fetching profile data:', error);
-        setIsLoading(false);
-      }
-    };
-
-    fetchProfileData();
+    loadProfileData();
   }, []);
+
+  const loadProfileData = async () => {
+    setIsLoading(true);
+    try {
+      // Get user data from localStorage
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!userData.id) {
+        toast.error('Please log in to view your profile');
+        navigate('/login');
+        return;
+      }
+
+      // Set the current user data
+      setProfileData({
+        firstName: userData.firstName || '',
+        lastName: userData.lastName || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        userId: userData.id
+      });
+
+      // Load user's recent purchases/reservations
+      try {
+        const reservationsResponse = await bookingAPI.getReservationsByCustomer(userData.id);
+        const reservations = reservationsResponse.data || [];
+        
+        // Transform reservations to recent purchases format
+        const purchases = reservations.map(reservation => ({
+          ticketNumber: reservation.reservationNumber || `RES-${reservation.id}`,
+          status: reservation.status || 'Confirmed',
+          flightNumber: reservation.flightNumber || 'N/A',
+          date: reservation.date || new Date().toISOString().split('T')[0]
+        }));
+        
+        setRecentPurchases(purchases);
+      } catch (error) {
+        console.log('No recent purchases found');
+        setRecentPurchases([]);
+      }
+
+      // For now, use empty payment methods (would come from a real API)
+      setPaymentMethods([]);
+      
+    } catch (error) {
+      console.error('Error loading profile data:', error);
+      toast.error('Error loading profile data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleProfileSave = async (formData) => {
     setIsLoading(true);
     try {
-      // In real app, send update to API
-      // const response = await fetch('/api/user/profile', {
-      //   method: 'PUT',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(formData)
-      // });
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!userData.id) {
+        toast.error('Please log in to update your profile');
+        navigate('/login');
+        return;
+      }
+
+      // Update user profile via API
+      const response = await authAPI.updateUserProfile(userData.id, formData);
       
-      console.log('Profile updated:', formData);
-      setProfileData({ ...profileData, ...formData });
-      alert('Profile updated successfully!');
+      if (response.data) {
+        // Update localStorage with new data
+        const updatedUser = { ...userData, ...formData };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        setProfileData({ ...profileData, ...formData });
+        toast.success('Profile updated successfully!');
+      }
       
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Error updating profile. Please try again.');
+      toast.error('Error updating profile. Please try again.');
     } finally {
       setIsLoading(false);
     }

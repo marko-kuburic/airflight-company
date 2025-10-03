@@ -56,12 +56,12 @@ public class Offer {
     @Column(name = "modified_at")
     private LocalDateTime modifiedAt;
     
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "flight_id")
     private Flight flight;
     
-    @OneToOne(mappedBy = "offer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Fare fare;
+    @OneToMany(mappedBy = "offer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Fare> fares = new ArrayList<>();
     
     @OneToMany(mappedBy = "offer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Reservation> reservations = new ArrayList<>();
@@ -174,12 +174,12 @@ public class Offer {
         this.flight = flight;
     }
     
-    public Fare getFare() {
-        return fare;
+    public List<Fare> getFares() {
+        return fares;
     }
     
-    public void setFare(Fare fare) {
-        this.fare = fare;
+    public void setFares(List<Fare> fares) {
+        this.fares = fares;
     }
     
     public List<Reservation> getReservations() {

@@ -238,6 +238,28 @@ public class FlightService {
     }
     
     /**
+     * Get all airports for dropdown search
+     */
+    public List<Map<String, String>> getAllAirports() {
+        TypedQuery<Airport> query = entityManager.createQuery(
+            "SELECT a FROM Airport a ORDER BY a.name", Airport.class);
+        
+        List<Airport> airports = query.getResultList();
+        
+        return airports.stream()
+            .map(airport -> {
+                Map<String, String> airportData = new HashMap<>();
+                airportData.put("code", airport.getIataCode());
+                airportData.put("name", airport.getName());
+                airportData.put("city", airport.getCity());
+                airportData.put("country", airport.getCountry().getName());
+                airportData.put("label", airport.getCity() + " (" + airport.getIataCode() + ")");
+                return airportData;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    /**
      * Generate seat configuration map
      */
     private Map<String, Object> generateSeatConfiguration(int capacity) {
