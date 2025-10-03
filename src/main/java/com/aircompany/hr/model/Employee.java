@@ -1,7 +1,6 @@
 package com.aircompany.hr.model;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -9,11 +8,6 @@ import java.util.List;
 
 @Entity
 @DiscriminatorValue("EMPLOYEE")
-@Getter
-@Setter
-@NoArgsConstructor
-@ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
 public class Employee extends User {
     
     @Column(name = "function")
@@ -55,8 +49,110 @@ public class Employee extends User {
     @Column(name = "consecutive_duty_days")
     private Integer consecutiveDutyDays = 0;
     
+    // Constructors
+    public Employee() {
+        super();
+    }
+    
     public Employee(String firstName, String lastName, String email, String password) {
         super(firstName, lastName, email, password);
+    }
+    
+    // Getters and Setters
+    public String getFunction() {
+        return function;
+    }
+    
+    public void setFunction(String function) {
+        this.function = function;
+    }
+    
+    public CrewPosition getCrewPosition() {
+        return crewPosition;
+    }
+    
+    public void setCrewPosition(CrewPosition crewPosition) {
+        this.crewPosition = crewPosition;
+    }
+    
+    public Qualification getQualification() {
+        return qualification;
+    }
+    
+    public void setQualification(Qualification qualification) {
+        this.qualification = qualification;
+    }
+    
+    public Schedule getSchedule() {
+        return schedule;
+    }
+    
+    public void setSchedule(Schedule schedule) {
+        this.schedule = schedule;
+    }
+    
+    public List<AircraftTypeRating> getAircraftTypeRatings() {
+        return aircraftTypeRatings;
+    }
+    
+    public void setAircraftTypeRatings(List<AircraftTypeRating> aircraftTypeRatings) {
+        this.aircraftTypeRatings = aircraftTypeRatings;
+    }
+    
+    public List<TrainingRecord> getTrainingRecords() {
+        return trainingRecords;
+    }
+    
+    public void setTrainingRecords(List<TrainingRecord> trainingRecords) {
+        this.trainingRecords = trainingRecords;
+    }
+    
+    public Integer getFlightHoursCurrentMonth() {
+        return flightHoursCurrentMonth;
+    }
+    
+    public void setFlightHoursCurrentMonth(Integer flightHoursCurrentMonth) {
+        this.flightHoursCurrentMonth = flightHoursCurrentMonth;
+    }
+    
+    public Integer getDutyHoursCurrentMonth() {
+        return dutyHoursCurrentMonth;
+    }
+    
+    public void setDutyHoursCurrentMonth(Integer dutyHoursCurrentMonth) {
+        this.dutyHoursCurrentMonth = dutyHoursCurrentMonth;
+    }
+    
+    public Integer getFlightHoursTotal() {
+        return flightHoursTotal;
+    }
+    
+    public void setFlightHoursTotal(Integer flightHoursTotal) {
+        this.flightHoursTotal = flightHoursTotal;
+    }
+    
+    public LocalDateTime getLastDutyEnd() {
+        return lastDutyEnd;
+    }
+    
+    public void setLastDutyEnd(LocalDateTime lastDutyEnd) {
+        this.lastDutyEnd = lastDutyEnd;
+    }
+    
+    public LocalDateTime getLastRestStart() {
+        return lastRestStart;
+    }
+    
+    public void setLastRestStart(LocalDateTime lastRestStart) {
+        this.lastRestStart = lastRestStart;
+    }
+    
+    public Integer getConsecutiveDutyDays() {
+        return consecutiveDutyDays;
+    }
+    
+    public void setConsecutiveDutyDays(Integer consecutiveDutyDays) {
+        this.consecutiveDutyDays = consecutiveDutyDays;
     }
     
     @Override

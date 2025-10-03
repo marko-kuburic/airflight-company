@@ -1,7 +1,6 @@
 package com.aircompany.hr.model;
 
 import jakarta.persistence.*;
-import lombok.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.aircompany.flight.model.Service;
@@ -12,11 +11,6 @@ import java.util.List;
 @Entity
 @DiscriminatorValue("TECHNICIAN")
 @EntityListeners(AuditingEntityListener.class)
-@Getter
-@Setter
-@NoArgsConstructor
-@ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
 public class Technician extends User {
     
     @Column(name = "flight_hours")
@@ -31,9 +25,46 @@ public class Technician extends User {
     @OneToMany(mappedBy = "technician", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Service> services = new ArrayList<>();
     
-    // Custom constructor
+    // Constructors
+    public Technician() {
+        super();
+    }
+    
     public Technician(String firstName, String lastName, String email, String password) {
         super(firstName, lastName, email, password);
+    }
+    
+    // Getters and Setters
+    public Integer getFlightHours() {
+        return flightHours;
+    }
+    
+    public void setFlightHours(Integer flightHours) {
+        this.flightHours = flightHours;
+    }
+    
+    public LocalDateTime getLastDutyEnd() {
+        return lastDutyEnd;
+    }
+    
+    public void setLastDutyEnd(LocalDateTime lastDutyEnd) {
+        this.lastDutyEnd = lastDutyEnd;
+    }
+    
+    public String getSpecialization() {
+        return specialization;
+    }
+    
+    public void setSpecialization(String specialization) {
+        this.specialization = specialization;
+    }
+    
+    public List<Service> getServices() {
+        return services;
+    }
+    
+    public void setServices(List<Service> services) {
+        this.services = services;
     }
     
     @Override

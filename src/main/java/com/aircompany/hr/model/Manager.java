@@ -1,15 +1,9 @@
 package com.aircompany.hr.model;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @DiscriminatorValue("MANAGER")
-@Getter
-@Setter
-@NoArgsConstructor
-@ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
 public class Manager extends User {
     
     @Column(name = "department")
@@ -21,8 +15,38 @@ public class Manager extends User {
     @Column(name = "team_size")
     private Integer teamSize;
     
+    // Constructors
+    public Manager() {
+        super();
+    }
+    
     public Manager(String firstName, String lastName, String email, String password) {
         super(firstName, lastName, email, password);
+    }
+    
+    // Getters and Setters
+    public String getDepartment() {
+        return department;
+    }
+    
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+    
+    public String getManagementLevel() {
+        return managementLevel;
+    }
+    
+    public void setManagementLevel(String managementLevel) {
+        this.managementLevel = managementLevel;
+    }
+    
+    public Integer getTeamSize() {
+        return teamSize;
+    }
+    
+    public void setTeamSize(Integer teamSize) {
+        this.teamSize = teamSize;
     }
     
     @Override
