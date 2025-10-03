@@ -1,0 +1,54 @@
+{
+  "name": "airflight-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.4.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.1",
+    "react-scripts": "5.0.1",
+    "axios": "^1.3.4",
+    "web-vitals": "^2.1.4",
+    "socket.io-client": "^4.6.1",
+    "date-fns": "^2.29.3",
+    "react-hook-form": "^7.43.7",
+    "react-hot-toast": "^2.4.0",
+    "@heroicons/react": "^2.0.16"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "dev": "react-scripts start"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.2.7",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.21",
+    "@tailwindcss/forms": "^0.5.3",
+    "@tailwindcss/typography": "^0.5.9"
+  },
+  "proxy": "http://backend:8080"
+}
