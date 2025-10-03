@@ -6,8 +6,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import com.aircompany.hr.model.Schedule;
-import com.aircompany.hr.model.FlightDispatcher;
+// import com.aircompany.hr.model.Schedule;
+// import com.aircompany.hr.model.FlightDispatcher;
 import com.aircompany.sales.model.Offer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -54,12 +54,12 @@ public class Flight {
     @JoinColumn(name = "route_id")
     private Route route;
     
-    @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Schedule> schedules = new ArrayList<>();
+    // @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    // private List<Schedule> schedules = new ArrayList<>();
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "flight_dispatcher_id")
-    private FlightDispatcher flightDispatcher;
+    // @ManyToOne(fetch = FetchType.LAZY)
+    // @JoinColumn(name = "flight_dispatcher_id")
+    // private FlightDispatcher flightDispatcher;
     
     
     // Constructors
@@ -144,21 +144,21 @@ public class Flight {
         this.route = route;
     }
     
-    public List<Schedule> getSchedules() {
-        return schedules;
-    }
+    // public List<Schedule> getSchedules() {
+    //     return schedules;
+    // }
     
-    public void setSchedules(List<Schedule> schedules) {
-        this.schedules = schedules;
-    }
+    // public void setSchedules(List<Schedule> schedules) {
+    //     this.schedules = schedules;
+    // }
     
-    public FlightDispatcher getFlightDispatcher() {
-        return flightDispatcher;
-    }
+    // public FlightDispatcher getFlightDispatcher() {
+    //     return flightDispatcher;
+    // }
     
-    public void setFlightDispatcher(FlightDispatcher flightDispatcher) {
-        this.flightDispatcher = flightDispatcher;
-    }
+    // public void setFlightDispatcher(FlightDispatcher flightDispatcher) {
+    //     this.flightDispatcher = flightDispatcher;
+    // }
     
     
     // Nested Enum

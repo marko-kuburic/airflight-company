@@ -36,6 +36,7 @@ docker-compose.override.yml
 
 # Node.js
 node_modules/
+frontend/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

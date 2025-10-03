@@ -1,5 +1,6 @@
 package com.aircompany.sales.repository;
 
+import com.aircompany.hr.model.Customer;
 import com.aircompany.sales.model.Loyalty;
 import com.aircompany.sales.model.Loyalty.LoyaltyTier;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,11 @@ public interface LoyaltyRepository extends JpaRepository<Loyalty, Long> {
      * Find loyalty record by customer ID
      */
     Optional<Loyalty> findByCustomerId(Long customerId);
+    
+    /**
+     * Find loyalty record by customer
+     */
+    Optional<Loyalty> findByCustomer(Customer customer);
     
     /**
      * Find loyalty records by tier

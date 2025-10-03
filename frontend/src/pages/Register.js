@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { authAPI } from "../services/api";
+import toast from "react-hot-toast";
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -9,6 +11,8 @@ export default function Register() {
     password: "",
     confirmPassword: ""
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -18,16 +22,51 @@ export default function Register() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match!");
+      toast.error("Passwords don't match!");
       return;
     }
-    
-    console.log("Register submitted:", formData);
-    // TODO: Implement actual registration logic
+
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters long!");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { confirmPassword, ...registerData } = formData;
+      const response = await authAPI.register(registerData);
+      
+      if (response.data) {
+        // Store user data and token
+        if (response.data.token) {
+          localStorage.setItem('authToken', response.data.token);
+        }
+        
+        if (response.data.user || response.data.customer) {
+          const userData = response.data.user || response.data.customer;
+          localStorage.setItem('user', JSON.stringify(userData));
+          
+          toast.success(`Welcome, ${userData.firstName}! Your account has been created.`);
+          
+          // Redirect to dashboard
+          navigate('/dashboard');
+        } else {
+          toast.success('Registration successful! Please log in.');
+          navigate('/login');
+        }
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      const errorMessage = error.response?.data?.message || 'Registration failed. Please try again.';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -211,7 +250,8 @@ export default function Register() {
 
           <button
             type="submit"
-            className="w-full h-[40px] rounded-lg mt-[14px] hover:opacity-90 transition-opacity"
+            disabled={isLoading}
+            className="w-full h-[40px] rounded-lg mt-[14px] hover:opacity-90 transition-opacity disabled:opacity-50"
             style={{
               backgroundColor: "#3F8EFC",
               fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
@@ -221,10 +261,10 @@ export default function Register() {
               color: "#FFFFFF",
               textDecoration: "underline",
               border: "none",
-              cursor: "pointer"
+              cursor: isLoading ? "not-allowed" : "pointer"
             }}
           >
-            Register
+            {isLoading ? "Creating account..." : "Register"}
           </button>
         </form>
 

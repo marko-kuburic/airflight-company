@@ -1,14 +1,47 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { authAPI } from "../services/api";
+import toast from "react-hot-toast";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login submitted:", { email, password });
-    // TODO: Implement actual login logic
+    setIsLoading(true);
+
+    try {
+      const response = await authAPI.login({ email, password });
+      
+      if (response.data) {
+        // Store user data and token
+        if (response.data.token) {
+          localStorage.setItem('authToken', response.data.token);
+        }
+        
+        if (response.data.user || response.data.customer) {
+          const userData = response.data.user || response.data.customer;
+          localStorage.setItem('user', JSON.stringify(userData));
+          
+          toast.success(`Welcome back, ${userData.firstName || userData.email}!`);
+          
+          // Redirect to dashboard or home
+          navigate('/dashboard');
+        } else {
+          toast.success('Login successful!');
+          navigate('/');
+        }
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.message || 'Login failed. Please check your credentials.';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -97,7 +130,8 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full h-[40px] rounded-lg mt-[14px] hover:opacity-90 transition-opacity"
+            disabled={isLoading}
+            className="w-full h-[40px] rounded-lg mt-[14px] hover:opacity-90 transition-opacity disabled:opacity-50"
             style={{
               backgroundColor: "#3F8EFC",
               fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
@@ -107,10 +141,10 @@ export default function Login() {
               color: "#FFFFFF",
               textDecoration: "underline",
               border: "none",
-              cursor: "pointer"
+              cursor: isLoading ? "not-allowed" : "pointer"
             }}
           >
-            Log in
+            {isLoading ? "Logging in..." : "Log in"}
           </button>
         </form>
 

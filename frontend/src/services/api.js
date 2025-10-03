@@ -47,6 +47,18 @@ api.interceptors.response.use(
 );
 
 // API endpoints
+export const authAPI = {
+  // Authentication
+  login: (credentials) => api.post('/users/login', credentials),
+  register: (userData) => api.post('/users/register', userData),
+  
+  // User management
+  getUserProfile: (userId) => api.get(`/users/profile/${userId}`),
+  updateUserProfile: (userId, data) => api.put(`/users/profile/${userId}`, data),
+  getUserReservations: (userId) => api.get(`/users/${userId}/reservations`),
+  getUserLoyalty: (userId) => api.get(`/users/${userId}/loyalty`),
+};
+
 export const flightAPI = {
   // Flight search
   searchFlights: (params) => api.get('/flights/search', { params }),

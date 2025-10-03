@@ -7,7 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import com.aircompany.hr.model.Technician;
+// import com.aircompany.hr.model.Technician;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,9 +51,9 @@ public class Service {
     @JoinColumn(name = "aircraft_id")
     private Aircraft aircraft;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "technician_id")
-    private Technician technician;
+    // @ManyToOne(fetch = FetchType.LAZY)
+    // @JoinColumn(name = "technician_id")
+    // private Technician technician;
     
     // Constructors
     public Service() {}
@@ -138,13 +138,13 @@ public class Service {
         this.aircraft = aircraft;
     }
     
-    public Technician getTechnician() {
-        return technician;
-    }
+    // public Technician getTechnician() {
+    //     return technician;
+    // }
     
-    public void setTechnician(Technician technician) {
-        this.technician = technician;
-    }
+    // public void setTechnician(Technician technician) {
+    //     this.technician = technician;
+    // }
     
     // Nested Enums
     public enum ServiceType {

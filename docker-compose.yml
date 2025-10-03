@@ -53,6 +53,22 @@ services:
       retries: 3
       start_period: 60s
 
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: air-company-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - app
+    networks:
+      - air-company-network
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:8080/api
+
   # Redis (for caching and sessions)
   redis:
     image: redis:7-alpine
