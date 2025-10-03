@@ -3,7 +3,6 @@ package com.aircompany.hr.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -14,11 +13,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "aircraft_type_ratings")
 @EntityListeners(AuditingEntityListener.class)
-@Getter
-@Setter
-@NoArgsConstructor
-@ToString
-@EqualsAndHashCode
 public class AircraftTypeRating {
     
     @Id
@@ -67,6 +61,90 @@ public class AircraftTypeRating {
         this.issueDate = issueDate;
         this.expiryDate = expiryDate;
         this.certificationBody = certificationBody;
+    }
+    
+    // Default constructor
+    public AircraftTypeRating() {}
+    
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public Employee getPilot() {
+        return pilot;
+    }
+    
+    public void setPilot(Employee pilot) {
+        this.pilot = pilot;
+    }
+    
+    public String getAircraftType() {
+        return aircraftType;
+    }
+    
+    public void setAircraftType(String aircraftType) {
+        this.aircraftType = aircraftType;
+    }
+    
+    public LocalDate getIssueDate() {
+        return issueDate;
+    }
+    
+    public void setIssueDate(LocalDate issueDate) {
+        this.issueDate = issueDate;
+    }
+    
+    public LocalDate getExpiryDate() {
+        return expiryDate;
+    }
+    
+    public void setExpiryDate(LocalDate expiryDate) {
+        this.expiryDate = expiryDate;
+    }
+    
+    public String getCertificationBody() {
+        return certificationBody;
+    }
+    
+    public void setCertificationBody(String certificationBody) {
+        this.certificationBody = certificationBody;
+    }
+    
+    public String getCertificateNumber() {
+        return certificateNumber;
+    }
+    
+    public void setCertificateNumber(String certificateNumber) {
+        this.certificateNumber = certificateNumber;
+    }
+    
+    public RatingStatus getStatus() {
+        return status;
+    }
+    
+    public void setStatus(RatingStatus status) {
+        this.status = status;
+    }
+    
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+    
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+    
+    public LocalDateTime getModifiedAt() {
+        return modifiedAt;
+    }
+    
+    public void setModifiedAt(LocalDateTime modifiedAt) {
+        this.modifiedAt = modifiedAt;
     }
     
     // Business logic methods

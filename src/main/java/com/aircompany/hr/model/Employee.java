@@ -10,7 +10,7 @@ import java.util.List;
 @DiscriminatorValue("EMPLOYEE")
 public class Employee extends User {
     
-    @Column(name = "function")
+    @Column(name = "`function`")
     private String function;
     
     @Enumerated(EnumType.STRING)
@@ -21,9 +21,8 @@ public class Employee extends User {
     @JoinColumn(name = "qualification_id")
     private Qualification qualification;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "schedule_id")
-    private Schedule schedule;
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Schedule> schedules = new ArrayList<>();
     
     @OneToMany(mappedBy = "pilot", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<AircraftTypeRating> aircraftTypeRatings = new ArrayList<>();
@@ -83,12 +82,12 @@ public class Employee extends User {
         this.qualification = qualification;
     }
     
-    public Schedule getSchedule() {
-        return schedule;
+    public List<Schedule> getSchedules() {
+        return schedules;
     }
     
-    public void setSchedule(Schedule schedule) {
-        this.schedule = schedule;
+    public void setSchedules(List<Schedule> schedules) {
+        this.schedules = schedules;
     }
     
     public List<AircraftTypeRating> getAircraftTypeRatings() {

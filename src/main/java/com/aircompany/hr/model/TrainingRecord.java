@@ -3,7 +3,6 @@ package com.aircompany.hr.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -14,11 +13,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "training_records")
 @EntityListeners(AuditingEntityListener.class)
-@Getter
-@Setter
-@NoArgsConstructor
-@ToString
-@EqualsAndHashCode
 public class TrainingRecord {
     
     @Id
@@ -85,6 +79,98 @@ public class TrainingRecord {
         this.trainingName = trainingName;
         this.completionDate = completionDate;
         this.certificationBody = certificationBody;
+    }
+    
+    // Default constructor
+    public TrainingRecord() {}
+    
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public Employee getEmployee() {
+        return employee;
+    }
+    
+    public void setEmployee(Employee employee) {
+        this.employee = employee;
+    }
+    
+    public TrainingType getTrainingType() {
+        return trainingType;
+    }
+    
+    public void setTrainingType(TrainingType trainingType) {
+        this.trainingType = trainingType;
+    }
+    
+    public String getTrainingName() {
+        return trainingName;
+    }
+    
+    public void setTrainingName(String trainingName) {
+        this.trainingName = trainingName;
+    }
+    
+    public LocalDate getCompletionDate() {
+        return completionDate;
+    }
+    
+    public void setCompletionDate(LocalDate completionDate) {
+        this.completionDate = completionDate;
+    }
+    
+    public String getCertificationBody() {
+        return certificationBody;
+    }
+    
+    public void setCertificationBody(String certificationBody) {
+        this.certificationBody = certificationBody;
+    }
+    
+    public String getCertificateNumber() {
+        return certificateNumber;
+    }
+    
+    public void setCertificateNumber(String certificateNumber) {
+        this.certificateNumber = certificateNumber;
+    }
+    
+    public LocalDate getNextDueDate() {
+        return nextDueDate;
+    }
+    
+    public void setNextDueDate(LocalDate nextDueDate) {
+        this.nextDueDate = nextDueDate;
+    }
+    
+    public String getDescription() {
+        return description;
+    }
+    
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+    
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+    
+    public LocalDateTime getModifiedAt() {
+        return modifiedAt;
+    }
+    
+    public void setModifiedAt(LocalDateTime modifiedAt) {
+        this.modifiedAt = modifiedAt;
     }
     
     // Business logic methods
