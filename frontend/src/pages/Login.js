@@ -28,11 +28,11 @@ export default function Login() {
           
           toast.success(`Welcome back, ${userData.firstName || userData.email}!`);
           
-          // Redirect to dashboard or home
-          navigate('/dashboard');
+          // Redirect to flight search page
+          navigate('/search');
         } else {
           toast.success('Login successful!');
-          navigate('/');
+          navigate('/search');
         }
       }
     } catch (error) {

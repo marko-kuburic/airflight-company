@@ -6,15 +6,20 @@ export function SearchDropdown({
   value, 
   onChange, 
   placeholder = "Search for a city or airport...",
-  className = "" 
+  className = "",
+  isOrigin = false,
+  isDestination = false,
+  otherFieldValue = null
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [airports, setAirports] = useState([]);
   const [filteredAirports, setFilteredAirports] = useState([]);
+  const [anywhereOptions, setAnywhereOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [showAnywhere, setShowAnywhere] = useState(false);
   
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
@@ -38,6 +43,42 @@ export function SearchDropdown({
 
     loadAirports();
   }, []);
+
+  // Load anywhere options when other field has a value
+  useEffect(() => {
+    const loadAnywhereOptions = async () => {
+      if (!otherFieldValue) {
+        setAnywhereOptions([]);
+        setShowAnywhere(false);
+        return;
+      }
+
+      try {
+        const otherCode = otherFieldValue.match(/\(([^)]+)\)/)?.[1];
+        if (!otherCode) return;
+
+        let response;
+        if (isOrigin) {
+          // If this is origin field and destination is selected, get origins to that destination
+          response = await flightAPI.getOriginsToDestination(otherCode);
+        } else if (isDestination) {
+          // If this is destination field and origin is selected, get destinations from that origin
+          response = await flightAPI.getDestinationsFromOrigin(otherCode);
+        }
+
+        if (response && response.data) {
+          setAnywhereOptions(response.data);
+          setShowAnywhere(true);
+        }
+      } catch (error) {
+        console.error("Error loading anywhere options:", error);
+        setAnywhereOptions([]);
+        setShowAnywhere(false);
+      }
+    };
+
+    loadAnywhereOptions();
+  }, [otherFieldValue, isOrigin, isDestination]);
 
   // Enhanced filter airports based on search term - smart search like airline websites
   useEffect(() => {
@@ -129,7 +170,9 @@ export function SearchDropdown({
   const handleKeyDown = (e) => {
     if (!isOpen) return;
 
-    const maxIndex = Math.min(filteredAirports.length - 1, 7); // Limit to 8 items
+    const anywhereCount = showAnywhere ? Math.min(anywhereOptions.length, 5) : 0;
+    const regularCount = showAnywhere ? Math.min(filteredAirports.length, 3) : Math.min(filteredAirports.length, 8);
+    const maxIndex = 1 + anywhereCount + regularCount - 1; // +1 for "Anywhere" option
 
     switch (e.key) {
       case 'ArrowDown':
@@ -138,12 +181,27 @@ export function SearchDropdown({
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : 0); // Don't go below 0 (Anywhere option)
         break;
       case 'Enter':
         e.preventDefault();
-        if (selectedIndex >= 0 && filteredAirports[selectedIndex]) {
-          handleAirportSelect(filteredAirports[selectedIndex]);
+        if (selectedIndex >= 0) {
+          if (selectedIndex === 0) {
+            // Selecting "Anywhere"
+            handleAnywhereSelect();
+          } else if (selectedIndex <= anywhereCount) {
+            // Selecting from anywhere options
+            const anywhereIndex = selectedIndex - 1;
+            if (anywhereOptions[anywhereIndex]) {
+              handleAirportSelect(anywhereOptions[anywhereIndex]);
+            }
+          } else {
+            // Selecting from regular airports
+            const regularIndex = selectedIndex - 1 - anywhereCount;
+            if (filteredAirports[regularIndex]) {
+              handleAirportSelect(filteredAirports[regularIndex]);
+            }
+          }
         }
         break;
       case 'Escape':
@@ -178,16 +236,28 @@ export function SearchDropdown({
   };
 
   const handleAirportSelect = (airport) => {
-    const displayValue = airport.label; // e.g., "Belgrade (BEG)"
+    const displayValue = airport.label || airport.name || airport; // Handle "Anywhere" case
+    // Update local state immediately
     setSearchTerm(displayValue);
-    onChange(displayValue);
     setIsOpen(false);
     setIsFocused(false);
+    // Notify parent component
+    onChange(displayValue);
+  };
+
+  // Handle "Anywhere" selection
+  const handleAnywhereSelect = () => {
+    // Update local state immediately
+    setSearchTerm("Anywhere");
+    setIsOpen(false);
+    setIsFocused(false);
+    // Notify parent component
+    onChange("Anywhere");
   };
 
   // Initialize display value when value prop changes
   useEffect(() => {
-    if (value && !isFocused) {
+    if (value !== undefined && !isFocused) {
       setSearchTerm(value);
     }
   }, [value, isFocused]);
@@ -209,7 +279,7 @@ export function SearchDropdown({
         <input
           ref={inputRef}
           type="text"
-          value={isFocused ? searchTerm : (searchTerm || "")}
+          value={isFocused ? searchTerm : (value || searchTerm || "")}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
@@ -237,51 +307,144 @@ export function SearchDropdown({
               <div className="p-3 text-xs text-gray-500 text-center">
                 Loading airports...
               </div>
-            ) : filteredAirports.length > 0 ? (
-              filteredAirports.slice(0, 8).map((airport, index) => ( // Limit to 8 results for better UX
+            ) : (
+              <>
+                {/* Always show "Anywhere" option at the top */}
                 <div
-                  key={airport.code}
-                  className={`p-3 text-xs cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
-                    selectedIndex === index 
+                  className={`p-3 text-xs cursor-pointer border-b border-gray-100 transition-colors ${
+                    selectedIndex === 0 
                       ? 'bg-blue-100 border-blue-200' 
                       : 'hover:bg-blue-50'
                   }`}
-                  onClick={() => handleAirportSelect(airport)}
+                  onClick={handleAnywhereSelect}
                   style={{ color: "#6B7785" }}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="font-semibold text-gray-800 mb-1">
-                        {airport.city} 
+                        Anywhere
                         <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono ${
-                          selectedIndex === index 
+                          selectedIndex === 0 
                             ? 'bg-blue-600 text-white' 
                             : 'bg-blue-100 text-blue-800'
                         }`}>
-                          {airport.code}
+                          ANY
                         </span>
                       </div>
                       <div className={`text-xs ${
-                        selectedIndex === index ? 'text-gray-600' : 'text-gray-500'
+                        selectedIndex === 0 ? 'text-gray-600' : 'text-gray-500'
                       }`}>
-                        {airport.name}
-                      </div>
-                      <div className={`text-xs mt-0.5 ${
-                        selectedIndex === index ? 'text-gray-500' : 'text-gray-400'
-                      }`}>
-                        {airport.country}
+                        Search all destinations
                       </div>
                     </div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="p-4 text-xs text-gray-500 text-center">
-                <div className="mb-1">No airports found</div>
-                <div className="text-xs text-gray-400">
-                  Try searching by city, airport name, country, or IATA code
-                </div>
-              </div>
+
+                {/* Show "Anywhere" options if available */}
+                {showAnywhere && anywhereOptions.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 bg-blue-50 border-b border-blue-200">
+                      <div className="text-xs font-semibold text-blue-800">
+                        {isOrigin ? "Anywhere to " : "Anywhere from "}
+                        {otherFieldValue?.split('(')[0]?.trim()}
+                      </div>
+                    </div>
+                    {anywhereOptions.slice(0, 5).map((airport, index) => {
+                      const adjustedIndex = index + 1; // +1 because "Anywhere" is at index 0
+                      return (
+                        <div
+                          key={`anywhere-${airport.code}`}
+                          className={`p-3 text-xs cursor-pointer border-b border-gray-100 transition-colors ${
+                            selectedIndex === adjustedIndex 
+                              ? 'bg-blue-100 border-blue-200' 
+                              : 'hover:bg-blue-50'
+                          }`}
+                          onClick={() => handleAirportSelect(airport)}
+                          style={{ color: "#6B7785" }}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-800 mb-1">
+                                {airport.city} 
+                                <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono ${
+                                  selectedIndex === adjustedIndex 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {airport.code}
+                                </span>
+                              </div>
+                              <div className={`text-xs ${
+                                selectedIndex === adjustedIndex ? 'text-gray-600' : 'text-gray-500'
+                              }`}>
+                                {airport.name}
+                              </div>
+                              <div className={`text-xs mt-0.5 ${
+                                selectedIndex === adjustedIndex ? 'text-gray-500' : 'text-gray-400'
+                              }`}>
+                                {airport.country}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {filteredAirports.length > 0 && (
+                      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                        <div className="text-xs font-semibold text-gray-600">
+                          All Airports
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {/* Regular filtered airports */}
+                {filteredAirports.length > 0 && (
+                  filteredAirports.slice(0, showAnywhere ? 3 : 8).map((airport, index) => {
+                    const baseIndex = 1; // Start after "Anywhere" option
+                    const anywhereCount = showAnywhere ? Math.min(anywhereOptions.length, 5) : 0;
+                    const adjustedIndex = baseIndex + anywhereCount + index;
+                    return (
+                      <div
+                        key={airport.code}
+                        className={`p-3 text-xs cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
+                          selectedIndex === adjustedIndex 
+                            ? 'bg-blue-100 border-blue-200' 
+                            : 'hover:bg-blue-50'
+                        }`}
+                        onClick={() => handleAirportSelect(airport)}
+                        style={{ color: "#6B7785" }}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-800 mb-1">
+                              {airport.city} 
+                              <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono ${
+                                selectedIndex === adjustedIndex 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {airport.code}
+                              </span>
+                            </div>
+                            <div className={`text-xs ${
+                              selectedIndex === adjustedIndex ? 'text-gray-600' : 'text-gray-500'
+                            }`}>
+                              {airport.name}
+                            </div>
+                            <div className={`text-xs mt-0.5 ${
+                              selectedIndex === adjustedIndex ? 'text-gray-500' : 'text-gray-400'
+                            }`}>
+                              {airport.country}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </>
             )}
           </div>
         )}

@@ -60,18 +60,23 @@ export const authAPI = {
 };
 
 export const flightAPI = {
-  // Flight search - using test endpoint for now
-  searchFlights: (params) => api.get('/test/flights', { params }),
+  // Flight search
+  searchFlights: (params) => api.get('/flights/search', { params }),
   getFlightById: (id) => api.get(`/flights/${id}`),
   
   // Airports
   getAirports: () => api.get('/flights/airports'),
+  getDestinationsFromOrigin: (origin) => api.get('/flights/destinations', { params: { origin } }),
+  getOriginsToDestination: (destination) => api.get('/flights/origins', { params: { destination } }),
   
   // Offers
   getOffers: () => api.get('/offers'),
   getOfferById: (id) => api.get(`/offers/${id}`),
   getOffersByFlight: (flightId) => api.get(`/offers/flight/${flightId}`),
   checkOfferValidity: (id) => api.get(`/offers/${id}/validity`),
+  
+  // Refresh expired offers with new pricing
+  refreshOffer: (flightId) => api.post(`/flights/${flightId}/refresh-offer`),
   
   // Seat management
   getOccupiedSeats: (flightId) => api.get(`/bookings/flights/${flightId}/occupied-seats`),

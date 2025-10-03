@@ -29,13 +29,35 @@ public class FlightDataInitializer implements CommandLineRunner {
         Long flightCount = entityManager.createQuery("SELECT COUNT(f) FROM Flight f", Long.class).getSingleResult();
         Long countryCount = entityManager.createQuery("SELECT COUNT(c) FROM Country c", Long.class).getSingleResult();
         Long fareCount = entityManager.createQuery("SELECT COUNT(f) FROM Fare f", Long.class).getSingleResult();
+        Long routeCount = entityManager.createQuery("SELECT COUNT(r) FROM Route r", Long.class).getSingleResult();
         
-        if (flightCount > 0 || countryCount > 0 || fareCount > 0) {
-            System.out.println("Data already exists (Flights: " + flightCount + ", Countries: " + countryCount + ", Fares: " + fareCount + "). Skipping initialization.");
+        // Force regeneration to implement new city distribution if we have old Belgrade-centric data
+        boolean needsRegeneration = false;
+        if (routeCount > 0 && routeCount < 50) { // Old system had ~9 routes, new should have 90 (10*9)
+            System.out.println("🔄 Detected old Belgrade-centric route structure. Regenerating with all-city distribution...");
+            needsRegeneration = true;
+        }
+        
+        if ((flightCount > 0 || countryCount > 0 || fareCount > 0) && !needsRegeneration) {
+            System.out.println("Data already exists (Flights: " + flightCount + ", Countries: " + countryCount + ", Routes: " + routeCount + ", Fares: " + fareCount + ").");
+            
+            // Check if we need to add more flights (should have 1000 flights)
+            if (flightCount < 1000) {
+                System.out.println("🚀 Expanding flight data to 1000 flights over 20 days...");
+                expandFlightData();
+                System.out.println("✅ Flight data expansion completed successfully!");
+            } else {
+                System.out.println("Flight data is already complete. Skipping initialization.");
+            }
             return;
         }
         
-        System.out.println("🚀 Starting flight data initialization according to specification...");
+        if (needsRegeneration) {
+            System.out.println("�️ Clearing old data for regeneration...");
+            clearOldData();
+        }
+        
+        System.out.println("�🚀 Starting flight data initialization with all-city distribution...");
         
         // Initialize all data
         initializeCountries();
@@ -46,6 +68,24 @@ public class FlightDataInitializer implements CommandLineRunner {
         initializeFlights();
         
         System.out.println("✅ Flight data initialization completed successfully!");
+    }
+    
+    private void clearOldData() {
+        System.out.println("Clearing offers and fares...");
+        entityManager.createQuery("DELETE FROM Fare").executeUpdate();
+        entityManager.createQuery("DELETE FROM Offer").executeUpdate();
+        
+        System.out.println("Clearing flights...");
+        entityManager.createQuery("DELETE FROM Flight").executeUpdate();
+        
+        System.out.println("Clearing route segments...");
+        entityManager.createQuery("DELETE FROM Segment").executeUpdate();
+        
+        System.out.println("Clearing routes...");
+        entityManager.createQuery("DELETE FROM Route").executeUpdate();
+        
+        entityManager.flush();
+        System.out.println("✓ Old data cleared successfully");
     }
     
     private void initializeCountries() {
@@ -166,87 +206,147 @@ public class FlightDataInitializer implements CommandLineRunner {
     }
     
     private void initializeRoutes() {
-        System.out.println("🗺️ Creating routes...");
+        System.out.println("🗺️ Creating routes between all city pairs...");
         
         // Get all airports
         List<Airport> airports = entityManager.createQuery("SELECT a FROM Airport a", Airport.class).getResultList();
-        Airport belgradeAirport = airports.stream()
-            .filter(a -> "BEG".equals(a.getIataCode()))
-            .findFirst()
-            .orElse(null);
         
-        if (belgradeAirport == null) {
-            System.err.println("Belgrade airport not found!");
-            return;
-        }
+        int routeCount = 0;
         
-        // Create routes from Belgrade to other airports
-        for (Airport destAirport : airports) {
-            if (!destAirport.equals(belgradeAirport)) {
-                Route route = new Route();
-                route.setName(belgradeAirport.getCity() + " to " + destAirport.getCity());
-                
-                // Calculate distance using Haversine formula
-                double distance = calculateDistance(
-                    belgradeAirport.getLatitude().doubleValue(),
-                    belgradeAirport.getLongitude().doubleValue(),
-                    destAirport.getLatitude().doubleValue(),
-                    destAirport.getLongitude().doubleValue()
-                );
-                route.setTotalDistance(new BigDecimal(String.format("%.2f", distance)));
-                
-                entityManager.persist(route);
-                
-                // Create segment for this route
-                Segment segment = new Segment();
-                segment.setRoute(route);
-                segment.setOriginAirport(belgradeAirport);
-                segment.setDestinationAirport(destAirport);
-                segment.setDistance(new BigDecimal(String.format("%.2f", distance)));
-                entityManager.persist(segment);
+        // Create routes between all pairs of airports (both directions)
+        for (int i = 0; i < airports.size(); i++) {
+            for (int j = 0; j < airports.size(); j++) {
+                if (i != j) { // Don't create routes from an airport to itself
+                    Airport originAirport = airports.get(i);
+                    Airport destAirport = airports.get(j);
+                    
+                    Route route = new Route();
+                    route.setName(originAirport.getCity() + " to " + destAirport.getCity());
+                    
+                    // Calculate distance using Haversine formula
+                    double distance = calculateDistance(
+                        originAirport.getLatitude().doubleValue(),
+                        originAirport.getLongitude().doubleValue(),
+                        destAirport.getLatitude().doubleValue(),
+                        destAirport.getLongitude().doubleValue()
+                    );
+                    route.setTotalDistance(new BigDecimal(String.format("%.2f", distance)));
+                    
+                    entityManager.persist(route);
+                    
+                    // Create segment for this route
+                    Segment segment = new Segment();
+                    segment.setRoute(route);
+                    segment.setOriginAirport(originAirport);
+                    segment.setDestinationAirport(destAirport);
+                    segment.setDistance(new BigDecimal(String.format("%.2f", distance)));
+                    entityManager.persist(segment);
+                    
+                    routeCount++;
+                }
             }
         }
         
         entityManager.flush();
-        System.out.println("✓ Created routes from Belgrade to other destinations");
+        System.out.println("✓ Created " + routeCount + " routes between all " + airports.size() + " cities (bidirectional)");
     }
     
     private void initializeFlights() {
-        System.out.println("🛫 Creating flights with dynamic pricing offers...");
-        
+        System.out.println("🛫 Creating 1000 flights over the next 20 days with dynamic pricing offers...");
+        createFlightData();
+    }
+    
+    private void expandFlightData() {
+        System.out.println("🛫 Adding more flights to reach 1000 flights over 20 days...");
+        createFlightData();
+    }
+    
+    private void createFlightData() {
         // Get data for flight creation
         List<Route> routes = entityManager.createQuery("SELECT r FROM Route r", Route.class).getResultList();
         List<Aircraft> aircraft = entityManager.createQuery("SELECT a FROM Aircraft a", Aircraft.class).getResultList();
         
-        // Create 50 flights (reasonable number for testing)
-        for (int i = 1; i <= 50; i++) {
-            Flight flight = new Flight();
+        // Check current flight count
+        Long currentFlightCount = entityManager.createQuery("SELECT COUNT(f) FROM Flight f", Long.class).getSingleResult();
+        int targetFlights = 1000;
+        int flightsToCreate = targetFlights - currentFlightCount.intValue();
+        
+        if (flightsToCreate <= 0) {
+            System.out.println("Already have " + currentFlightCount + " flights. No additional flights needed.");
+            return;
+        }
+        
+        System.out.println("Creating " + flightsToCreate + " flights across " + routes.size() + " routes...");
+        
+        // Create flights distributed over 20 days
+        int daysToSpread = 20;
+        int flightsPerDay = flightsToCreate / daysToSpread;
+        int extraFlights = flightsToCreate % daysToSpread;
+        
+        int flightCounter = currentFlightCount.intValue() + 1;
+        
+        // Create flights for each day
+        for (int day = 0; day < daysToSpread; day++) {
+            int flightsForThisDay = flightsPerDay + (day < extraFlights ? 1 : 0);
+            LocalDateTime baseDate = LocalDateTime.now().plusDays(day);
             
-            // Generate flight number with JU prefix (Air Serbia)
-            flight.setFlightNumber("JU" + String.format("%04d", i));
-            
-            // Random route and aircraft
-            Route route = routes.get(random.nextInt(routes.size()));
-            Aircraft selectedAircraft = aircraft.get(random.nextInt(aircraft.size()));
-            
-            // Random departure time (next 30 days)
-            LocalDateTime baseTime = LocalDateTime.now().plusDays(random.nextInt(30));
-            LocalDateTime depTime = baseTime.withHour(6 + random.nextInt(16)).withMinute(0).withSecond(0);
-            
-            flight.setDepTime(depTime);
-            flight.setArrTime(depTime.plusHours(1 + random.nextInt(6))); // 1-7 hour flights
-            flight.setStatus(Flight.FlightStatus.SCHEDULED);
-            flight.setRoute(route);
-            flight.setAircraft(selectedAircraft);
-            
-            entityManager.persist(flight);
-            
-            // Create dynamic pricing offer for this flight according to specification
-            createDynamicPricingOffer(flight);
+            // Distribute flights throughout the day and across all routes
+            for (int flightOfDay = 0; flightOfDay < flightsForThisDay; flightOfDay++) {
+                Flight flight = new Flight();
+                
+                // Generate flight number with AC prefix (Air Company)
+                flight.setFlightNumber("AC" + String.format("%07d", flightCounter));
+                
+                // Select route in round-robin fashion for even distribution across all city pairs
+                Route route = routes.get((flightCounter - 1) % routes.size());
+                Aircraft selectedAircraft = aircraft.get(random.nextInt(aircraft.size()));
+                
+                // Distribute departure times throughout the day (5 AM to 11 PM)
+                int totalMinutesInDay = 18 * 60; // 18 hours * 60 minutes
+                int minuteOfDay = (flightOfDay * totalMinutesInDay) / flightsForThisDay;
+                int hourOfDay = 5 + (minuteOfDay / 60);
+                int minute = minuteOfDay % 60;
+                
+                LocalDateTime depTime = baseDate.withHour(hourOfDay).withMinute(minute).withSecond(0);
+                
+                // Calculate realistic arrival time based on distance
+                double distanceKm = route.getTotalDistance().doubleValue();
+                // Average commercial flight speed: 800-900 km/h, but factor in taxi, takeoff, landing
+                int baseDurationMinutes = (int) Math.round((distanceKm / 750.0) * 60); // 750 km/h average
+                int flightDurationMinutes = Math.max(60, baseDurationMinutes + 30 + random.nextInt(30)); // Min 1 hour, add buffer
+                
+                flight.setDepTime(depTime);
+                flight.setArrTime(depTime.plusMinutes(flightDurationMinutes));
+                flight.setStatus(Flight.FlightStatus.SCHEDULED);
+                flight.setRoute(route);
+                flight.setAircraft(selectedAircraft);
+                
+                entityManager.persist(flight);
+                
+                // Create dynamic pricing offer for this flight
+                createDynamicPricingOffer(flight);
+                
+                flightCounter++;
+                
+                // Flush every 50 flights to avoid memory issues
+                if (flightCounter % 50 == 0) {
+                    entityManager.flush();
+                    entityManager.clear();
+                    // Re-fetch routes and aircraft after clear
+                    routes = entityManager.createQuery("SELECT r FROM Route r", Route.class).getResultList();
+                    aircraft = entityManager.createQuery("SELECT a FROM Aircraft a", Aircraft.class).getResultList();
+                }
+            }
         }
         
         entityManager.flush();
-        System.out.println("✓ Created 50 flights with dynamic pricing offers");
+        System.out.println("✓ Created " + flightsToCreate + " flights distributed over " + daysToSpread + " days");
+        System.out.println("✓ Total flights in system: " + targetFlights);
+        System.out.println("✓ Flights distributed across " + routes.size() + " routes between all city pairs");
+        
+        // Print distribution summary
+        System.out.println("✓ Average flights per route: " + (targetFlights / routes.size()));
+        System.out.println("✓ Average flights per day: " + (targetFlights / daysToSpread));
     }
     
     private void createDynamicPricingOffer(Flight flight) {

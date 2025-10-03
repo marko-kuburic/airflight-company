@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -42,48 +43,73 @@ public class FlightService {
     
     /**
      * Search for flights based on search criteria
+     * Supports "Anywhere" searches where origin and/or destination can be empty
      */
     public List<FlightSearchResponse> searchFlights(FlightSearchRequest searchRequest) {
-        logger.info("Searching flights from {} to {} on {}", 
+        logger.info("Searching flights from '{}' to '{}' on {}", 
             searchRequest.getOrigin(), searchRequest.getDestination(), searchRequest.getDepartureDate());
+        
+        // Check for "Anywhere" searches
+        boolean hasOrigin = searchRequest.getOrigin() != null && !searchRequest.getOrigin().trim().isEmpty();
+        boolean hasDestination = searchRequest.getDestination() != null && !searchRequest.getDestination().trim().isEmpty();
+        
+        logger.info("Search type: hasOrigin={}, hasDestination={}", hasOrigin, hasDestination);
         
         // Build dynamic query based on search criteria
         StringBuilder jpql = new StringBuilder(
-            "SELECT f FROM Flight f " +
-            "JOIN f.route r " +
-            "JOIN r.segments s " +
-            "JOIN s.originAirport origin " +
-            "JOIN s.destinationAirport dest " +
-            "WHERE DATE(f.depTime) = :departureDate " +
+            "SELECT DISTINCT f FROM Flight f " +
+            "JOIN FETCH f.route r " +
+            "JOIN FETCH r.segments s " +
+            "JOIN FETCH s.originAirport origin " +
+            "JOIN FETCH s.destinationAirport dest " +
+            "JOIN FETCH f.aircraft " +
+            "WHERE f.depTime >= :startOfDay AND f.depTime < :endOfDay " +
             "AND f.status = :status "
         );
         
-        // Add origin/destination filters if provided
-        if (searchRequest.getOrigin() != null && !searchRequest.getOrigin().trim().isEmpty()) {
-            jpql.append("AND (origin.code = :origin OR origin.name LIKE :originName) ");
+        // Add origin/destination filters if provided and not empty
+        if (hasOrigin) {
+            jpql.append("AND (origin.iataCode = :origin OR origin.name LIKE :originName) ");
         }
         
-        if (searchRequest.getDestination() != null && !searchRequest.getDestination().trim().isEmpty()) {
-            jpql.append("AND (dest.code = :destination OR dest.name LIKE :destinationName) ");
+        if (hasDestination) {
+            jpql.append("AND (dest.iataCode = :destination OR dest.name LIKE :destinationName) ");
         }
         
         jpql.append("ORDER BY f.depTime ASC");
         
         TypedQuery<Flight> query = entityManager.createQuery(jpql.toString(), Flight.class);
-        query.setParameter("departureDate", searchRequest.getDepartureDate());
+        
+        // Set date range parameters
+        LocalDateTime startOfDay = searchRequest.getDepartureDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+        query.setParameter("startOfDay", startOfDay);
+        query.setParameter("endOfDay", endOfDay);
         query.setParameter("status", Flight.FlightStatus.SCHEDULED);
         
-        if (searchRequest.getOrigin() != null && !searchRequest.getOrigin().trim().isEmpty()) {
+        if (hasOrigin) {
             query.setParameter("origin", searchRequest.getOrigin().toUpperCase());
             query.setParameter("originName", "%" + searchRequest.getOrigin() + "%");
         }
         
-        if (searchRequest.getDestination() != null && !searchRequest.getDestination().trim().isEmpty()) {
+        if (hasDestination) {
             query.setParameter("destination", searchRequest.getDestination().toUpperCase());
             query.setParameter("destinationName", "%" + searchRequest.getDestination() + "%");
         }
         
+        // Limit results for "Anywhere" searches to avoid overwhelming the UI
+        if (!hasOrigin && !hasDestination) {
+            // Both are "Anywhere" - limit to 50 flights
+            query.setMaxResults(50);
+            logger.info("Anywhere to Anywhere search - limiting to 50 results");
+        } else if (!hasOrigin || !hasDestination) {
+            // One is "Anywhere" - limit to 100 flights
+            query.setMaxResults(100);
+            logger.info("Partial Anywhere search - limiting to 100 results");
+        }
+        
         List<Flight> flights = query.getResultList();
+        logger.info("Found {} flights for search criteria", flights.size());
         
         // Convert to response DTOs with dynamic pricing
         return flights.stream()
@@ -96,6 +122,28 @@ public class FlightService {
      */
     public Flight getFlightById(Long id) {
         return entityManager.find(Flight.class, id);
+    }
+    
+    /**
+     * Get all flights (for debugging purposes)
+     */
+    @Transactional(readOnly = true)
+    public List<Flight> getAllFlights() {
+        String jpql = "SELECT f FROM Flight f ORDER BY f.depTime ASC";
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setMaxResults(100); // Limit to avoid too much data
+        return query.getResultList();
+    }
+    
+    /**
+     * Get flight response DTO by ID with current pricing
+     */
+    public FlightSearchResponse getFlightResponseById(Long id) {
+        Flight flight = getFlightById(id);
+        if (flight == null) {
+            throw new RuntimeException("Flight not found with ID: " + id);
+        }
+        return convertToFlightResponse(flight);
     }
     
     /**
@@ -172,8 +220,8 @@ public class FlightService {
         response.setDuration(calculateDuration(flight.getDepTime(), flight.getArrTime()));
         
         // Get dynamic pricing
-        response.setBasePrice(dynamicPricingService.getBasePrice(flight));
-        response.setCurrentPrice(dynamicPricingService.getCurrentPrice(flight));
+        response.setBasePrice(dynamicPricingService.getBasePrice(flight, offers));
+        response.setCurrentPrice(dynamicPricingService.getCurrentPrice(flight, offers));
         
         // Get available seats
         List<String> occupiedSeats = getOccupiedSeats(flight.getId());
@@ -240,20 +288,95 @@ public class FlightService {
     /**
      * Get all airports for dropdown search
      */
+    @Transactional(readOnly = true)
     public List<Map<String, String>> getAllAirports() {
-        TypedQuery<Airport> query = entityManager.createQuery(
-            "SELECT a FROM Airport a ORDER BY a.name", Airport.class);
+        String query = """
+            SELECT a.iata_code, a.name, a.city, c.name as country_name
+            FROM airports a 
+            LEFT JOIN countries c ON a.country_code = c.code 
+            ORDER BY a.name
+        """;
         
-        List<Airport> airports = query.getResultList();
+        List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
         
-        return airports.stream()
-            .map(airport -> {
+        return results.stream()
+            .map(row -> {
                 Map<String, String> airportData = new HashMap<>();
-                airportData.put("code", airport.getIataCode());
-                airportData.put("name", airport.getName());
-                airportData.put("city", airport.getCity());
-                airportData.put("country", airport.getCountry().getName());
-                airportData.put("label", airport.getCity() + " (" + airport.getIataCode() + ")");
+                airportData.put("code", (String) row[0]);
+                airportData.put("name", (String) row[1]);
+                airportData.put("city", (String) row[2]);
+                airportData.put("country", (String) row[3]);
+                airportData.put("label", row[2] + " (" + row[0] + ")");
+                return airportData;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get all destinations from a specific origin airport
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, String>> getDestinationsFromOrigin(String originCode) {
+        String query = """
+            SELECT DISTINCT dest.iata_code, dest.name, dest.city, c.name as country_name
+            FROM flights f
+            JOIN routes r ON f.route_id = r.id
+            JOIN segments s ON r.id = s.route_id
+            JOIN airports origin ON s.origin_airport_id = origin.id
+            JOIN airports dest ON s.destination_airport_id = dest.id
+            LEFT JOIN countries c ON dest.country_code = c.code
+            WHERE origin.iata_code = :originCode
+            AND f.status = 'SCHEDULED'
+            ORDER BY dest.city
+        """;
+        
+        List<Object[]> results = entityManager.createNativeQuery(query)
+            .setParameter("originCode", originCode.toUpperCase())
+            .getResultList();
+        
+        return results.stream()
+            .map(row -> {
+                Map<String, String> airportData = new HashMap<>();
+                airportData.put("code", (String) row[0]);
+                airportData.put("name", (String) row[1]);
+                airportData.put("city", (String) row[2]);
+                airportData.put("country", (String) row[3]);
+                airportData.put("label", row[2] + " (" + row[0] + ")");
+                return airportData;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get all origins to a specific destination airport
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, String>> getOriginsToDestination(String destinationCode) {
+        String query = """
+            SELECT DISTINCT origin.iata_code, origin.name, origin.city, c.name as country_name
+            FROM flights f
+            JOIN routes r ON f.route_id = r.id
+            JOIN segments s ON r.id = s.route_id
+            JOIN airports origin ON s.origin_airport_id = origin.id
+            JOIN airports dest ON s.destination_airport_id = dest.id
+            LEFT JOIN countries c ON origin.country_code = c.code
+            WHERE dest.iata_code = :destinationCode
+            AND f.status = 'SCHEDULED'
+            ORDER BY origin.city
+        """;
+        
+        List<Object[]> results = entityManager.createNativeQuery(query)
+            .setParameter("destinationCode", destinationCode.toUpperCase())
+            .getResultList();
+        
+        return results.stream()
+            .map(row -> {
+                Map<String, String> airportData = new HashMap<>();
+                airportData.put("code", (String) row[0]);
+                airportData.put("name", (String) row[1]);
+                airportData.put("city", (String) row[2]);
+                airportData.put("country", (String) row[3]);
+                airportData.put("label", row[2] + " (" + row[0] + ")");
                 return airportData;
             })
             .collect(Collectors.toList());

@@ -5,8 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { SearchDropdown } from "./SearchDropdown";
 
 export function SearchBar({ onSearchResults }) {
-  const [from, setFrom] = useState("Belgrade (BEG)");
-  const [to, setTo] = useState("Paris (CDG)");
+  const [from, setFrom] = useState("Anywhere");
+  const [to, setTo] = useState("Anywhere");
   const [date, setDate] = useState("2025-09-10");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -15,9 +15,17 @@ export function SearchBar({ onSearchResults }) {
     try {
       setLoading(true);
       
-      // Extract airport codes from the input
-      const originCode = from.match(/\(([^)]+)\)/)?.[1] || from;
-      const destinationCode = to.match(/\(([^)]+)\)/)?.[1] || to;
+      // Extract airport codes from the input, or use empty string for "Anywhere"
+      let originCode = "";
+      let destinationCode = "";
+      
+      if (from && from !== "Anywhere") {
+        originCode = from.match(/\(([^)]+)\)/)?.[1] || from;
+      }
+      
+      if (to && to !== "Anywhere") {
+        destinationCode = to.match(/\(([^)]+)\)/)?.[1] || to;
+      }
       
       const searchParams = {
         origin: originCode,
@@ -54,6 +62,8 @@ export function SearchBar({ onSearchResults }) {
           value={from}
           onChange={setFrom}
           placeholder="City, airport, country or code..."
+          isOrigin={true}
+          otherFieldValue={to}
         />
 
         {/* To Field */}
@@ -62,6 +72,8 @@ export function SearchBar({ onSearchResults }) {
           value={to}
           onChange={setTo}
           placeholder="City, airport, country or code..."
+          isDestination={true}
+          otherFieldValue={from}
         />
 
         {/* Date Field */}

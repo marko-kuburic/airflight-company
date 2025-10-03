@@ -1,6 +1,7 @@
 package com.aircompany.sales.service;
 
 import com.aircompany.flight.model.Flight;
+import com.aircompany.sales.model.Offer;
 import com.aircompany.sales.model.Reservation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.DayOfWeek;
+import java.util.List;
 import java.time.temporal.ChronoUnit;
 
 /**
@@ -69,10 +71,65 @@ public class DynamicPricingService {
     }
     
     /**
+     * Get base price for a flight with pre-fetched offers to avoid lazy loading
+     */
+    public BigDecimal getBasePrice(Flight flight, List<Offer> offers) {
+        // Base price calculation - simplified version
+        // In real implementation, this would come from fare tables based on route distance, aircraft type, etc.
+        
+        if (offers != null && !offers.isEmpty()) {
+            // Return the base price of the first offer (typically economy)
+            return offers.get(0).getBasePrice();
+        }
+        
+        // Fallback: calculate based on route distance (simplified)
+        BigDecimal basePrice = new BigDecimal("100"); // Base fare
+        
+        if (flight.getRoute() != null && flight.getRoute().getTotalDistance() != null) {
+            // Add distance-based pricing: 0.10 per km
+            BigDecimal distancePrice = flight.getRoute().getTotalDistance().multiply(new BigDecimal("0.10"));
+            basePrice = basePrice.add(distancePrice);
+        }
+        
+        return basePrice.setScale(2, RoundingMode.HALF_UP);
+    }
+    
+    /**
      * Calculate current dynamic price based on all factors
      */
     public BigDecimal getCurrentPrice(Flight flight) {
         BigDecimal basePrice = getBasePrice(flight);
+        
+        // Apply demand-based multiplier
+        BigDecimal demandMultiplier = calculateDemandMultiplier(flight);
+        
+        // Apply seasonal multiplier
+        BigDecimal seasonalMultiplier = calculateSeasonalMultiplier(flight.getDepTime());
+        
+        // Apply weekend multiplier
+        BigDecimal weekendMultiplier = calculateWeekendMultiplier(flight.getDepTime());
+        
+        // Apply time-based multiplier (early booking vs last minute)
+        BigDecimal timeMultiplier = calculateTimeBasedMultiplier(flight.getDepTime());
+        
+        // Calculate final price
+        BigDecimal finalPrice = basePrice
+            .multiply(demandMultiplier)
+            .multiply(seasonalMultiplier)
+            .multiply(weekendMultiplier)
+            .multiply(timeMultiplier);
+        
+        logger.debug("Dynamic pricing for flight {}: base={}, demand={}, season={}, weekend={}, time={}, final={}", 
+            flight.getId(), basePrice, demandMultiplier, seasonalMultiplier, weekendMultiplier, timeMultiplier, finalPrice);
+        
+        return finalPrice.setScale(2, RoundingMode.HALF_UP);
+    }
+    
+    /**
+     * Calculate current dynamic price based on all factors with pre-fetched offers
+     */
+    public BigDecimal getCurrentPrice(Flight flight, List<Offer> offers) {
+        BigDecimal basePrice = getBasePrice(flight, offers);
         
         // Apply demand-based multiplier
         BigDecimal demandMultiplier = calculateDemandMultiplier(flight);

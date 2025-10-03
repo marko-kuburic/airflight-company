@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { SearchBar } from "../components/SearchBar";
-import { FlightRow } from "../components/FlightRow";
+import { FlightCard } from "../components/FlightCard";
+import { Sidebar } from "../components/Sidebar";
 import { useNavigate } from "react-router-dom";
 
 export default function FlightSearch() {
@@ -18,26 +19,40 @@ export default function FlightSearch() {
     navigate('/booking', { state: { selectedFlight: flight } });
   };
 
+  const handleFlightUpdate = (updatedFlight) => {
+    // Update the specific flight in search results
+    setSearchResults(prevResults => 
+      prevResults.map(flight => 
+        flight.flightId === updatedFlight.flightId ? updatedFlight : flight
+      )
+    );
+  };
+
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#EEF4FB" }}>
-      <div className="container mx-auto px-4 py-8">
-        <h1 
-          className="text-2xl font-bold mb-6 text-center"
-          style={{
-            fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
-            color: "#2F3E4D"
-          }}
-        >
-          Search Flights
-        </h1>
-        
-        {/* SearchBar komponenta */}
-        <div className="max-w-4xl mx-auto">
-          <SearchBar onSearchResults={handleSearchResults} />
-        </div>
-        
-        {/* Flight search results */}
-        <div className="max-w-4xl mx-auto">
+    <div className="flex min-h-screen" style={{ backgroundColor: "#EEF4FB" }}>
+      {/* Sidebar */}
+      <Sidebar />
+      
+      {/* Main content */}
+      <div className="flex-1 ml-0 lg:ml-64">
+        <div className="container mx-auto px-4 py-8">
+          <h1 
+            className="text-2xl font-bold mb-6 text-center"
+            style={{
+              fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
+              color: "#2F3E4D"
+            }}
+          >
+            Search Flights
+          </h1>
+          
+          {/* SearchBar komponenta */}
+          <div className="max-w-4xl mx-auto">
+            <SearchBar onSearchResults={handleSearchResults} />
+          </div>
+          
+          {/* Flight search results */}
+          <div className="max-w-4xl mx-auto">
           {isSearched ? (
             searchResults.length > 0 ? (
               <div className="bg-white rounded-xl" style={{ border: "1px solid #D9E1EA" }}>
@@ -48,17 +63,12 @@ export default function FlightSearch() {
                 </div>
                 <div>
                   {searchResults.map((flight, index) => (
-                    <div key={flight.id || index} className="cursor-pointer hover:bg-gray-50" onClick={() => handleFlightSelect(flight)}>
-                      <FlightRow
-                        flightNumber={flight.flightNumber}
-                        route={`${flight.originAirport} → ${flight.destinationAirport}`}
-                        departure={flight.departureTime}
-                        arrival={flight.arrivalTime}
-                        flightClass={flight.cabinClass || "Economy"}
-                        price={`€${flight.price}`}
-                        offerTime={flight.offerValidUntil || "24h"}
-                      />
-                    </div>
+                    <FlightCard
+                      key={flight.id || index}
+                      flight={flight}
+                      onFlightSelect={handleFlightSelect}
+                      onFlightUpdate={handleFlightUpdate}
+                    />
                   ))}
                 </div>
               </div>
@@ -94,6 +104,7 @@ export default function FlightSearch() {
               </p>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
