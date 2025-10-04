@@ -1,17 +1,28 @@
-package com.aircompany.sales.service;
+package com.aircompany.flight.service;
 
-import com.aircompany.flight.model.Flight;
-import com.aircompany.flight.model.Airport;
+import com.aircompany.flight.dto.FlightRequestDto;
+import com.aircompany.flight.dto.FlightResponseDto;
 import com.aircompany.flight.model.Aircraft;
+import com.aircompany.flight.model.Flight;
+import com.aircompany.flight.model.Flight.FlightStatus;
+import com.aircompany.flight.model.Route;
+import com.aircompany.flight.repository.AircraftRepository;
+import com.aircompany.flight.repository.FlightRepository;
+import com.aircompany.flight.repository.RouteRepository;
+import com.aircompany.hr.model.FlightDispatcher;
+import com.aircompany.hr.repository.FlightDispatcherRepository;
 import com.aircompany.sales.dto.FlightSearchRequest;
 import com.aircompany.sales.dto.FlightSearchResponse;
 import com.aircompany.sales.model.Offer;
 import com.aircompany.sales.model.Ticket;
 import com.aircompany.sales.repository.TicketRepository;
+import com.aircompany.sales.service.OfferService;
+import com.aircompany.sales.service.DynamicPricingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -24,12 +35,25 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class FlightService {
     
     private static final Logger logger = LoggerFactory.getLogger(FlightService.class);
     
     @PersistenceContext
     private EntityManager entityManager;
+    
+    @Autowired
+    private FlightRepository flightRepository;
+    
+    @Autowired
+    private AircraftRepository aircraftRepository;
+    
+    @Autowired
+    private RouteRepository routeRepository;
+    
+    @Autowired
+    private FlightDispatcherRepository flightDispatcherRepository;
     
     @Autowired
     private TicketRepository ticketRepository;
@@ -39,6 +63,130 @@ public class FlightService {
     
     @Autowired
     private DynamicPricingService dynamicPricingService;
+    
+    // ========== FLIGHT MANAGEMENT METHODS ==========
+    
+    public List<FlightResponseDto> getAllFlights() {
+        return flightRepository.findAll().stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+    
+    public Optional<FlightResponseDto> getFlightById(Long id) {
+        return flightRepository.findById(id)
+                .map(this::convertToResponseDto);
+    }
+    
+    public List<FlightResponseDto> getFlightsByStatus(FlightStatus status) {
+        return flightRepository.findByStatus(status).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+    
+    public List<FlightResponseDto> getFlightsByDateRange(LocalDateTime startTime, LocalDateTime endTime) {
+        return flightRepository.findByDepTimeBetween(startTime, endTime).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+    
+    public List<FlightResponseDto> getFlightsByAircraft(Long aircraftId) {
+        return flightRepository.findByAircraftId(aircraftId).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+    
+    public List<FlightResponseDto> getFlightsByRoute(Long routeId) {
+        return flightRepository.findByRouteId(routeId).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+    
+    public List<FlightResponseDto> getFlightsByDispatcher(Long flightDispatcherId) {
+        return flightRepository.findByFlightDispatcherId(flightDispatcherId).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+    
+    public FlightResponseDto createFlight(FlightRequestDto requestDto) {
+        Aircraft aircraft = null;
+        if (requestDto.getAircraftId() != null) {
+            aircraft = aircraftRepository.findById(requestDto.getAircraftId())
+                    .orElseThrow(() -> new IllegalArgumentException("Aircraft with ID " + requestDto.getAircraftId() + " not found"));
+        }
+        
+        Route route = null;
+        if (requestDto.getRouteId() != null) {
+            route = routeRepository.findById(requestDto.getRouteId())
+                    .orElseThrow(() -> new IllegalArgumentException("Route with ID " + requestDto.getRouteId() + " not found"));
+        }
+        
+        FlightDispatcher flightDispatcher = null;
+        if (requestDto.getFlightDispatcherId() != null) {
+            flightDispatcher = flightDispatcherRepository.findById(requestDto.getFlightDispatcherId())
+                    .orElseThrow(() -> new IllegalArgumentException("FlightDispatcher with ID " + requestDto.getFlightDispatcherId() + " not found"));
+        }
+        
+        Flight flight = new Flight(requestDto.getDepTime(), requestDto.getArrTime(), requestDto.getStatus());
+        flight.setAircraft(aircraft);
+        flight.setRoute(route);
+        flight.setFlightDispatcher(flightDispatcher);
+        
+        Flight savedFlight = flightRepository.save(flight);
+        return convertToResponseDto(savedFlight);
+    }
+    
+    public Optional<FlightResponseDto> updateFlight(Long id, FlightRequestDto requestDto) {
+        return flightRepository.findById(id)
+                .map(flight -> {
+                    flight.setDepTime(requestDto.getDepTime());
+                    flight.setArrTime(requestDto.getArrTime());
+                    flight.setStatus(requestDto.getStatus());
+                    
+                    if (requestDto.getAircraftId() != null) {
+                        Aircraft aircraft = aircraftRepository.findById(requestDto.getAircraftId())
+                                .orElseThrow(() -> new IllegalArgumentException("Aircraft with ID " + requestDto.getAircraftId() + " not found"));
+                        flight.setAircraft(aircraft);
+                    }
+                    
+                    if (requestDto.getRouteId() != null) {
+                        Route route = routeRepository.findById(requestDto.getRouteId())
+                                .orElseThrow(() -> new IllegalArgumentException("Route with ID " + requestDto.getRouteId() + " not found"));
+                        flight.setRoute(route);
+                    }
+                    
+                    if (requestDto.getFlightDispatcherId() != null) {
+                        FlightDispatcher flightDispatcher = flightDispatcherRepository.findById(requestDto.getFlightDispatcherId())
+                                .orElseThrow(() -> new IllegalArgumentException("FlightDispatcher with ID " + requestDto.getFlightDispatcherId() + " not found"));
+                        flight.setFlightDispatcher(flightDispatcher);
+                    }
+                    
+                    Flight savedFlight = flightRepository.save(flight);
+                    return convertToResponseDto(savedFlight);
+                });
+    }
+    
+    public Optional<FlightResponseDto> updateFlightStatus(Long id, FlightStatus status) {
+        return flightRepository.findById(id)
+                .map(flight -> {
+                    flight.setStatus(status);
+                    Flight savedFlight = flightRepository.save(flight);
+                    return convertToResponseDto(savedFlight);
+                });
+    }
+    
+    public boolean deleteFlight(Long id) {
+        if (flightRepository.existsById(id)) {
+            flightRepository.deleteById(id);
+            return true;
+        }
+        return false;
+    }
+    
+    public Long getFlightCountByStatus(FlightStatus status) {
+        return flightRepository.countByStatus(status);
+    }
+    
+    // ========== SALES METHODS ==========
     
     /**
      * Search for flights based on search criteria
@@ -87,14 +235,14 @@ public class FlightService {
         
         // Convert to response DTOs with dynamic pricing
         return flights.stream()
-            .map(this::convertToFlightResponse)
+            .map(this::convertToFlightSearchResponse)
             .collect(Collectors.toList());
     }
     
     /**
-     * Get flight by ID
+     * Get flight entity by ID (for sales operations)
      */
-    public Flight getFlightById(Long id) {
+    public Flight getFlightEntityById(Long id) {
         return entityManager.find(Flight.class, id);
     }
     
@@ -130,7 +278,7 @@ public class FlightService {
      * Get seat map configuration for a flight
      */
     public Map<String, Object> getSeatMap(Long flightId) {
-        Flight flight = getFlightById(flightId);
+        Flight flight = getFlightEntityById(flightId);
         if (flight == null) {
             throw new RuntimeException("Flight not found");
         }
@@ -157,10 +305,44 @@ public class FlightService {
         return seatMap;
     }
     
+    // ========== PRIVATE HELPER METHODS ==========
+    
+    private FlightResponseDto convertToResponseDto(Flight flight) {
+        FlightResponseDto responseDto = new FlightResponseDto();
+        responseDto.setId(flight.getId());
+        responseDto.setDepTime(flight.getDepTime());
+        responseDto.setArrTime(flight.getArrTime());
+        responseDto.setStatus(flight.getStatus());
+        responseDto.setCreatedAt(flight.getCreatedAt());
+        responseDto.setModifiedAt(flight.getModifiedAt());
+        
+        if (flight.getAircraft() != null) {
+            responseDto.setAircraftId(flight.getAircraft().getId());
+            responseDto.setAircraftModel(flight.getAircraft().getModel());
+        }
+        
+        if (flight.getRoute() != null) {
+            responseDto.setRouteId(flight.getRoute().getId());
+            responseDto.setRouteName(flight.getRoute().getName());
+        }
+        
+        if (flight.getFlightDispatcher() != null) {
+            responseDto.setFlightDispatcherId(flight.getFlightDispatcher().getId());
+            responseDto.setFlightDispatcherName(
+                    flight.getFlightDispatcher().getFirstName() + " " + 
+                    flight.getFlightDispatcher().getLastName()
+            );
+        }
+        
+        responseDto.setScheduleCount(flight.getSchedules().size());
+        
+        return responseDto;
+    }
+    
     /**
      * Convert Flight entity to FlightSearchResponse DTO
      */
-    private FlightSearchResponse convertToFlightResponse(Flight flight) {
+    private FlightSearchResponse convertToFlightSearchResponse(Flight flight) {
         List<Offer> offers = offerService.getActiveOffersForFlight(flight.getId());
         
         FlightSearchResponse response = new FlightSearchResponse(flight, offers);

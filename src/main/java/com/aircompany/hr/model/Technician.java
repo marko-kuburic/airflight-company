@@ -3,7 +3,7 @@ package com.aircompany.hr.model;
 import jakarta.persistence.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import com.aircompany.flight.model.Service;
+import com.aircompany.flight.model.Maintenance;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +23,7 @@ public class Technician extends User {
     private String specialization;
     
     @OneToMany(mappedBy = "technician", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Service> services = new ArrayList<>();
+    private List<Maintenance> services = new ArrayList<>();
     
     // Constructors
     public Technician() {
@@ -59,11 +59,11 @@ public class Technician extends User {
         this.specialization = specialization;
     }
     
-    public List<Service> getServices() {
+    public List<Maintenance> getServices() {
         return services;
     }
     
-    public void setServices(List<Service> services) {
+    public void setServices(List<Maintenance> services) {
         this.services = services;
     }
     

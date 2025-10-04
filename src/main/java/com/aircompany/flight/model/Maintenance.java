@@ -15,7 +15,7 @@ import java.util.List;
 @Entity
 @Table(name = "services")
 @EntityListeners(AuditingEntityListener.class)
-public class Service {
+public class Maintenance {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,9 +56,9 @@ public class Service {
     private Technician technician;
     
     // Constructors
-    public Service() {}
+    public Maintenance() {}
     
-    public Service(ServiceType serviceType, String description, Aircraft aircraft) {
+    public Maintenance(ServiceType serviceType, String description, Aircraft aircraft) {
         this.serviceType = serviceType;
         this.description = description;
         this.aircraft = aircraft;
