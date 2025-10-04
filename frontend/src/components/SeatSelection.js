@@ -5,8 +5,11 @@ const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
 };
 
-export function SeatSelection({ onSeatSelect }) {
+export function SeatSelection({ onSeatSelect, onPriceChange }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
+
+  // Premium seat pricing
+  const PREMIUM_SEAT_PRICE = 20.00; // €20 for premium seats
 
   const rows = 6;
   const leftSection = ["A", "B", "C"];
@@ -60,8 +63,8 @@ export function SeatSelection({ onSeatSelect }) {
     if (status === "premium") {
       return {
         ...baseStyle,
-        backgroundColor: '#34D399',
-        borderColor: '#d1d5db',
+        backgroundColor: '#f59e0b',
+        borderColor: '#f59e0b',
         cursor: 'pointer'
       };
     }
@@ -77,8 +80,16 @@ export function SeatSelection({ onSeatSelect }) {
     if (status !== "unavailable") {
       const newSelectedSeat = selectedSeat === seatId ? null : seatId;
       setSelectedSeat(newSelectedSeat);
+      
+      // Calculate pricing
+      const isPremium = status === "premium";
+      const seatPrice = isPremium ? PREMIUM_SEAT_PRICE : 0;
+      
       if (onSeatSelect) {
-        onSeatSelect(newSelectedSeat);
+        onSeatSelect(newSelectedSeat, { isPremium, price: seatPrice });
+      }
+      if (onPriceChange) {
+        onPriceChange(newSelectedSeat ? seatPrice : 0);
       }
     }
   };
@@ -123,6 +134,11 @@ export function SeatSelection({ onSeatSelect }) {
                       onMouseLeave={(e) => {
                         e.target.style.opacity = '1';
                       }}
+                      title={
+                        status === "premium" ? `Premium seat (+€${PREMIUM_SEAT_PRICE})` :
+                        status === "unavailable" ? "Seat unavailable" :
+                        "Standard seat (included)"
+                      }
                     />
                   );
                 })}
@@ -176,36 +192,7 @@ export function SeatSelection({ onSeatSelect }) {
     height: '10px'
   };
 
-  const buttonContainerStyle = {
-    display: 'flex',
-    gap: '10px'
-  };
 
-  const clearButtonStyle = {
-    flex: 1,
-    backgroundColor: 'white',
-    border: '1px solid #D1D5DB',
-    borderRadius: '8px',
-    padding: '10px 16px',
-    fontSize: '12px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease',
-    fontFamily: 'Inter, sans-serif'
-  };
-
-  const confirmButtonStyle = {
-    backgroundColor: '#2563eb',
-    color: 'white',
-    borderRadius: '8px',
-    padding: '10px 24px',
-    fontSize: '12px',
-    fontWeight: '500',
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease',
-    fontFamily: 'Inter, sans-serif'
-  };
 
   return (
     <div style={containerStyle}>
@@ -271,10 +258,10 @@ export function SeatSelection({ onSeatSelect }) {
         <div style={legendItemStyle}>
           <div style={{
             ...legendColorStyle,
-            backgroundColor: '#34D399',
-            border: '1px solid #d1d5db'
+            backgroundColor: '#f59e0b',
+            border: '1px solid #f59e0b'
           }} />
-          <span>Premium (+€)</span>
+          <span>Premium (+€{PREMIUM_SEAT_PRICE})</span>
         </div>
         <div style={legendItemStyle}>
           <div style={{
@@ -286,32 +273,36 @@ export function SeatSelection({ onSeatSelect }) {
         </div>
       </div>
 
-      <div style={buttonContainerStyle}>
-        <button 
-          style={clearButtonStyle}
-          onClick={() => setSelectedSeat(null)}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#f9fafb'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-        >
-          Clear Selection
-        </button>
-        <button 
-          style={confirmButtonStyle}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
-        >
-          Confirm Seat
-        </button>
-      </div>
-
       {selectedSeat && (
         <div style={{
-          marginTop: '12px',
+          backgroundColor: '#eff6ff',
+          border: '1px solid #dbeafe',
+          borderRadius: '6px',
+          padding: '12px',
           fontSize: '12px',
-          color: '#374151',
+          color: '#1e40af',
           fontWeight: '500'
         }}>
-          Selected seat: {selectedSeat}
+          <div style={{ marginBottom: '4px' }}>
+            ✓ Selected seat: <strong>{selectedSeat}</strong>
+          </div>
+          <div>
+            {seatData[selectedSeat] === "premium" 
+              ? `Premium seat - Additional €${PREMIUM_SEAT_PRICE}` 
+              : 'Standard seat - Included in ticket price'
+            }
+          </div>
+        </div>
+      )}
+
+      {!selectedSeat && (
+        <div style={{
+          fontSize: '12px',
+          color: '#6b7280',
+          fontStyle: 'italic',
+          textAlign: 'center'
+        }}>
+          Click on a seat to select it
         </div>
       )}
     </div>

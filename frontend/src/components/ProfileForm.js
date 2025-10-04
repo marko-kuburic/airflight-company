@@ -5,7 +5,9 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
     firstName: profileData?.firstName || '',
     lastName: profileData?.lastName || '',
     email: profileData?.email || '',
-    phone: profileData?.phone || ''
+    phone: profileData?.phone || '',
+    dateOfBirth: profileData?.dateOfBirth || '',
+    preferredLanguage: profileData?.preferredLanguage || ''
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -33,7 +35,9 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
       firstName: profileData?.firstName || '',
       lastName: profileData?.lastName || '',
       email: profileData?.email || '',
-      phone: profileData?.phone || ''
+      phone: profileData?.phone || '',
+      dateOfBirth: profileData?.dateOfBirth || '',
+      preferredLanguage: profileData?.preferredLanguage || ''
     });
     setIsEditing(false);
   };
@@ -135,7 +139,7 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
             onChange={(e) => handleInputChange('firstName', e.target.value)}
             style={inputStyle}
             disabled={!isEditing}
-            placeholder="Ana"
+            placeholder="Name"
           />
         </div>
         <div style={formGroupStyle}>
@@ -146,12 +150,12 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
             onChange={(e) => handleInputChange('lastName', e.target.value)}
             style={inputStyle}
             disabled={!isEditing}
-            placeholder="Petrović"
+            placeholder="Surname"
           />
         </div>
       </div>
 
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ marginBottom: '24px' }}>
         <label style={labelStyle}>Email</label>
         <input
           type="email"
@@ -159,7 +163,7 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
           onChange={(e) => handleInputChange('email', e.target.value)}
           style={inputStyle}
           disabled={!isEditing}
-          placeholder="ana@example.com"
+          placeholder="mail@example.com"
         />
       </div>
 
@@ -173,6 +177,34 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
           disabled={!isEditing}
           placeholder="+381 64 123 4567"
         />
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={labelStyle}>Date of Birth</label>
+        <input
+          type="date"
+          value={formData.dateOfBirth}
+          onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+          style={inputStyle}
+          disabled={!isEditing}
+        />
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={labelStyle}>Preferred Language</label>
+        <select
+          value={formData.preferredLanguage}
+          onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
+          style={inputStyle}
+          disabled={!isEditing}
+        >
+          <option value="">Select language</option>
+          <option value="en">English</option>
+          <option value="sr">Serbian</option>
+          <option value="de">German</option>
+          <option value="fr">French</option>
+          <option value="es">Spanish</option>
+        </select>
       </div>
 
       <div style={buttonContainerStyle}>

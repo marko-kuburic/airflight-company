@@ -91,24 +91,14 @@ export function RecentPurchases({ purchases }) {
             </div>
           ))
         ) : (
-          <>
-            <div style={purchaseItemStyle}>
-              <div style={ticketNumberStyle}>
-                TCK-10218 — <span style={{ color: getStatusColor('Confirmed') }}>Confirmed</span>
-              </div>
-              <div style={flightInfoStyle}>
-                FD-815 2025-08-28
-              </div>
+          <div style={purchaseItemStyle}>
+            <div style={ticketNumberStyle}>
+              No recent purchases
             </div>
-            <div style={purchaseItemStyle}>
-              <div style={ticketNumberStyle}>
-                TCK-10190 — <span style={{ color: getStatusColor('Cancelled') }}>Cancelled</span>
-              </div>
-              <div style={flightInfoStyle}>
-                FD-829 2025-08-12
-              </div>
+            <div style={flightInfoStyle}>
+              Your flight history will appear here
             </div>
-          </>
+          </div>
         )}
       </div>
 

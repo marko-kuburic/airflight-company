@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import java.math.BigDecimal;
@@ -138,12 +139,26 @@ public class FlightService {
     /**
      * Get flight response DTO by ID with current pricing
      */
+    @Transactional(readOnly = true)
     public FlightSearchResponse getFlightResponseById(Long id) {
-        Flight flight = getFlightById(id);
-        if (flight == null) {
+        // Use JOIN FETCH to avoid lazy loading issues
+        String jpql = "SELECT DISTINCT f FROM Flight f " +
+                     "JOIN FETCH f.route r " +
+                     "JOIN FETCH r.segments s " +
+                     "JOIN FETCH s.originAirport " +
+                     "JOIN FETCH s.destinationAirport " +
+                     "JOIN FETCH f.aircraft " +
+                     "WHERE f.id = :flightId";
+        
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setParameter("flightId", id);
+        
+        try {
+            Flight flight = query.getSingleResult();
+            return convertToFlightResponse(flight);
+        } catch (NoResultException e) {
             throw new RuntimeException("Flight not found with ID: " + id);
         }
-        return convertToFlightResponse(flight);
     }
     
     /**

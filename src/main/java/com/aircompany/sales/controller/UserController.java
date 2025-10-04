@@ -1,9 +1,7 @@
 package com.aircompany.sales.controller;
 
 import com.aircompany.hr.model.Customer;
-import com.aircompany.sales.dto.LoginRequest;
-import com.aircompany.sales.dto.RegisterRequest;
-import com.aircompany.sales.dto.UserProfileResponse;
+import com.aircompany.sales.dto.*;
 import com.aircompany.sales.service.UserService;
 import com.aircompany.sales.model.Loyalty;
 import jakarta.validation.Valid;
@@ -88,10 +86,14 @@ public class UserController {
     @GetMapping("/profile/{userId}")
     public ResponseEntity<?> getUserProfile(@PathVariable Long userId) {
         try {
+            logger.info("Getting profile for user ID: {}", userId);
             Optional<UserProfileResponse> profileOptional = userService.getUserProfile(userId);
             if (profileOptional.isPresent()) {
-                return ResponseEntity.ok(profileOptional.get());
+                UserProfileResponse profile = profileOptional.get();
+                logger.info("Profile found: ID={}, Email={}, FirstName={}", profile.getId(), profile.getEmail(), profile.getFirstName());
+                return ResponseEntity.ok(profile);
             } else {
+                logger.warn("No profile found for user ID: {}", userId);
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
@@ -105,13 +107,57 @@ public class UserController {
      */
     @PutMapping("/profile/{userId}")
     public ResponseEntity<?> updateUserProfile(@PathVariable Long userId, 
-                                             @Valid @RequestBody RegisterRequest updateRequest) {
+                                             @Valid @RequestBody UpdateUserProfileRequest updateRequest) {
         try {
-            // TODO: Implement profile update functionality
-            return ResponseEntity.ok(Map.of("message", "Profile update functionality coming soon"));
+            UserProfileResponse updatedProfile = userService.updateUserProfile(userId, updateRequest);
+            return ResponseEntity.ok(updatedProfile);
         } catch (Exception e) {
             logger.error("Error updating user profile for ID {}: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(createErrorResponse("Failed to update profile: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Get user's saved payment methods
+     */
+    @GetMapping("/{userId}/payment-methods")
+    public ResponseEntity<?> getUserPaymentMethods(@PathVariable Long userId) {
+        try {
+            List<SavedPaymentMethodResponse> paymentMethods = userService.getUserPaymentMethods(userId);
+            return ResponseEntity.ok(paymentMethods);
+        } catch (Exception e) {
+            logger.error("Error getting payment methods for user {}: {}", userId, e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Failed to get payment methods"));
+        }
+    }
+    
+    /**
+     * Save a new payment method
+     */
+    @PostMapping("/{userId}/payment-methods")
+    public ResponseEntity<?> savePaymentMethod(@PathVariable Long userId,
+                                              @Valid @RequestBody SavedPaymentMethodRequest request) {
+        try {
+            SavedPaymentMethodResponse savedMethod = userService.savePaymentMethod(userId, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedMethod);
+        } catch (Exception e) {
+            logger.error("Error saving payment method for user {}: {}", userId, e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Failed to save payment method: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Delete a saved payment method
+     */
+    @DeleteMapping("/{userId}/payment-methods/{paymentMethodId}")
+    public ResponseEntity<?> deletePaymentMethod(@PathVariable Long userId,
+                                                @PathVariable Long paymentMethodId) {
+        try {
+            userService.deletePaymentMethod(userId, paymentMethodId);
+            return ResponseEntity.ok(Map.of("message", "Payment method deleted successfully"));
+        } catch (Exception e) {
+            logger.error("Error deleting payment method {} for user {}: {}", paymentMethodId, userId, e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Failed to delete payment method: " + e.getMessage()));
         }
     }
     

@@ -10,13 +10,25 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for adding auth token
+// Request interceptor for adding auth token and cache-busting
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add cache-busting headers
+    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    config.headers['Pragma'] = 'no-cache';
+    config.headers['Expires'] = '0';
+    
+    // Add timestamp to prevent caching
+    if (config.method === 'get') {
+      config.params = config.params || {};
+      config.params._t = Date.now();
+    }
+    
     return config;
   },
   (error) => {
@@ -57,6 +69,11 @@ export const authAPI = {
   updateUserProfile: (userId, data) => api.put(`/users/profile/${userId}`, data),
   getUserReservations: (userId) => api.get(`/users/${userId}/reservations`),
   getUserLoyalty: (userId) => api.get(`/users/${userId}/loyalty`),
+  
+  // Payment methods
+  getUserPaymentMethods: (userId) => api.get(`/users/${userId}/payment-methods`),
+  savePaymentMethod: (userId, data) => api.post(`/users/${userId}/payment-methods`, data),
+  deletePaymentMethod: (userId, paymentMethodId) => api.delete(`/users/${userId}/payment-methods/${paymentMethodId}`),
 };
 
 export const flightAPI = {

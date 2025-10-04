@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { bookingAPI } from '../services/api';
+import { generatePDFTicket, generateBoardingPass } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
 
 export default function MyTickets() {
@@ -15,51 +16,82 @@ export default function MyTickets() {
 
   const loadTickets = async () => {
     try {
+      let allTickets = [];
+      
+      // Load from localStorage first (for completed bookings in this session)
+      const savedBookings = JSON.parse(localStorage.getItem('myBookings') || '[]');
+      const localTickets = savedBookings.map(booking => ({
+        id: booking.ticketNumber || `TCK-${booking.reservationId || Date.now()}`,
+        flightNumber: booking.flightDetails?.flightNumber || 'N/A',
+        route: booking.flightDetails?.route || 'N/A',
+        date: booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        class: booking.flightDetails?.class || 'Economy',
+        status: 'Confirmed',
+        passengerName: booking.passengerName,
+        totalAmount: booking.paymentAmount,
+        seat: booking.selectedSeat,
+        email: booking.email
+      }));
+      allTickets = [...localTickets];
+      
+      // Try to load from backend
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       if (userData.id) {
-        const response = await bookingAPI.getReservationsByCustomer(userData.id);
-        // Transform reservations to ticket format
-        const ticketData = response.data.map(reservation => ({
-          id: reservation.reservationNumber || `TCK-${reservation.id}`,
-          flightNumber: reservation.flightNumber,
-          route: reservation.route,
-          date: reservation.date,
-          class: 'Economy',
-          status: reservation.status
-        }));
-        setTickets(ticketData);
-      } else {
-        // Use sample data if no user logged in
-        setTickets([
+        try {
+          const response = await bookingAPI.getReservationsByCustomer(userData.id);
+          // Transform reservations to ticket format
+          const backendTickets = response.data.map(reservation => ({
+            id: reservation.reservationNumber || `TCK-${reservation.id}`,
+            flightNumber: reservation.flightNumber || 'N/A',
+            route: reservation.route || 'N/A',
+            date: reservation.date || new Date().toISOString().split('T')[0],
+            class: 'Economy',
+            status: reservation.status || 'Confirmed',
+            passengerName: reservation.passengerName,
+            totalAmount: reservation.totalAmount,
+            seat: reservation.seatNumber,
+            email: reservation.email
+          }));
+          
+          // Merge backend tickets with local tickets (avoid duplicates)
+          const backendTicketIds = new Set(backendTickets.map(t => t.id));
+          const uniqueLocalTickets = allTickets.filter(t => !backendTicketIds.has(t.id));
+          allTickets = [...backendTickets, ...uniqueLocalTickets];
+        } catch (backendError) {
+          console.warn('Backend not available, using localStorage only:', backendError);
+        }
+      }
+      
+      // If no tickets found, show sample data
+      if (allTickets.length === 0) {
+        allTickets = [
           {
-            id: 'TCK-10231',
+            id: 'TCK-SAMPLE',
             flightNumber: 'AC101',
             route: 'BEG → CDG',
             date: '2025-10-15',
             class: 'Economy',
-            status: 'Confirmed'
+            status: 'Confirmed',
+            passengerName: 'Sample Passenger',
+            totalAmount: '€142.00'
           }
-        ]);
+        ];
       }
+      
+      setTickets(allTickets);
     } catch (error) {
       console.error('Error loading tickets:', error);
       // Use sample data as fallback
       setTickets([
         {
-          id: 'TCK-10231',
+          id: 'TCK-SAMPLE',
           flightNumber: 'AC101',
           route: 'BEG → CDG',
           date: '2025-10-15',
           class: 'Economy',
-          status: 'Confirmed'
-        },
-        {
-          id: 'TCK-10218',
-          flightNumber: 'AC102',
-          route: 'BEG → CDG',
-          date: '2025-08-28',
-          class: 'Business',
-          status: 'Confirmed'
+          status: 'Confirmed',
+          passengerName: 'Sample Passenger',
+          totalAmount: '€142.00'
         }
       ]);
     } finally {
@@ -88,8 +120,8 @@ export default function MyTickets() {
 
   const tableHeaderStyle = {
     display: 'grid',
-    gridTemplateColumns: '120px 200px 120px 100px 120px 150px',
-    gap: '16px',
+    gridTemplateColumns: '120px 180px 120px 100px 140px 100px 100px 160px',
+    gap: '12px',
     padding: '16px 20px',
     backgroundColor: '#f9fafb',
     borderBottom: '1px solid #e5e7eb'
@@ -104,8 +136,8 @@ export default function MyTickets() {
 
   const tableRowStyle = {
     display: 'grid',
-    gridTemplateColumns: '120px 200px 120px 100px 120px 150px',
-    gap: '16px',
+    gridTemplateColumns: '120px 180px 120px 100px 140px 100px 100px 160px',
+    gap: '12px',
     padding: '16px 20px',
     borderBottom: '1px solid #f3f4f6',
     alignItems: 'center'
@@ -162,19 +194,26 @@ export default function MyTickets() {
 
   const getActionButtons = (ticket) => {
     const buttonBaseStyle = {
-      padding: '6px 16px',
-      borderRadius: '6px',
-      fontSize: '12px',
+      padding: '4px 8px',
+      borderRadius: '4px',
+      fontSize: '11px',
       fontWeight: '500',
       cursor: 'pointer',
       border: 'none',
-      marginRight: '8px',
+      marginRight: '4px',
+      marginBottom: '4px',
       fontFamily: 'Inter, sans-serif'
     };
 
-    const editButtonStyle = {
+    const downloadButtonStyle = {
       ...buttonBaseStyle,
       backgroundColor: '#2563eb',
+      color: 'white'
+    };
+
+    const boardingButtonStyle = {
+      ...buttonBaseStyle,
+      backgroundColor: '#10b981',
       color: 'white'
     };
 
@@ -184,86 +223,126 @@ export default function MyTickets() {
       color: 'white'
     };
 
-    const downloadButtonStyle = {
-      ...buttonBaseStyle,
-      backgroundColor: '#10b981',
-      color: 'white'
-    };
-
-    switch (ticket.status) {
-      case 'Created':
-        return (
-          <div>
-            <button 
-              style={editButtonStyle}
-              onClick={() => handleEdit(ticket.id)}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
-            >
-              Edit
-            </button>
-            <button 
-              style={cancelButtonStyle}
-              onClick={() => handleCancel(ticket.id)}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#b91c1c'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#dc2626'}
-            >
-              Cancel
-            </button>
-          </div>
-        );
-      case 'Confirmed':
-        return (
+    if (ticket.status === 'Confirmed') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <button 
             style={downloadButtonStyle}
-            onClick={() => handleDownload(ticket.id)}
+            onClick={() => handleDownloadTicket(ticket)}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
+            title="Download PDF Ticket"
+          >
+            📄 E-ticket
+          </button>
+          <button 
+            style={boardingButtonStyle}
+            onClick={() => handleDownloadBoardingPass(ticket)}
             onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
             onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+            title="Download Boarding Pass"
           >
-            Download e-ticket
+            🎫 Boarding Pass
           </button>
-        );
-      case 'Cancelled':
-      case 'Used':
-        return (
-          <div>
-            <button 
-              style={editButtonStyle}
-              onClick={() => handleEdit(ticket.id)}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
-            >
-              Edit
-            </button>
-            <button 
-              style={cancelButtonStyle}
-              onClick={() => handleCancel(ticket.id)}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#b91c1c'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#dc2626'}
-            >
-              Cancel
-            </button>
-          </div>
-        );
-      default:
-        return null;
+        </div>
+      );
+    } else if (ticket.status === 'Created') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <button 
+            style={cancelButtonStyle}
+            onClick={() => handleCancel(ticket.id)}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#b91c1c'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#dc2626'}
+          >
+            Cancel
+          </button>
+        </div>
+      );
     }
+    return null;
   };
 
   const handleEdit = (ticketId) => {
     console.log('Edit ticket:', ticketId);
-    // Navigate to edit page
-    navigate(`/tickets/${ticketId}/edit`);
+    toast.info('Editing functionality coming soon!');
   };
 
   const handleCancel = (ticketId) => {
     console.log('Cancel ticket:', ticketId);
-    // API call to cancel ticket
+    toast.info('Cancellation functionality coming soon!');
+  };
+
+  const handleDownloadTicket = (ticket) => {
+    try {
+      console.log('Download ticket:', ticket.id);
+      
+      // Convert ticket data to the format expected by PDF generator
+      const ticketData = {
+        ticketNumber: ticket.id,
+        status: 'Confirmed / Paid',
+        flightDetails: {
+          flightNumber: ticket.flightNumber,
+          route: ticket.route,
+          departure: 'N/A', // You might want to add these fields to your ticket data
+          arrival: 'N/A',
+          class: ticket.class
+        },
+        passengerName: ticket.passengerName,
+        bookingReference: `REF-${ticket.id}`,
+        paymentAmount: ticket.totalAmount,
+        email: ticket.email,
+        selectedSeat: ticket.seat,
+        paymentMethod: 'Card',
+        bookingDate: ticket.date
+      };
+
+      const success = generatePDFTicket(ticketData);
+      
+      if (success) {
+        toast.success('✈️ E-ticket downloaded successfully!');
+      } else {
+        throw new Error('PDF generation failed');
+      }
+    } catch (error) {
+      console.error('Error downloading ticket:', error);
+      toast.error('❌ Error downloading ticket. Please try again.');
+    }
+  };
+
+  const handleDownloadBoardingPass = (ticket) => {
+    try {
+      console.log('Download boarding pass:', ticket.id);
+      
+      // Convert ticket data to the format expected by PDF generator
+      const ticketData = {
+        ticketNumber: ticket.id,
+        flightDetails: {
+          flightNumber: ticket.flightNumber,
+          route: ticket.route,
+          class: ticket.class
+        },
+        passengerName: ticket.passengerName,
+        selectedSeat: ticket.seat,
+        bookingDate: ticket.date
+      };
+
+      const success = generateBoardingPass(ticketData);
+      
+      if (success) {
+        toast.success('🎫 Boarding pass downloaded successfully!');
+      } else {
+        throw new Error('Boarding pass generation failed');
+      }
+    } catch (error) {
+      console.error('Error downloading boarding pass:', error);
+      toast.error('❌ Error downloading boarding pass. Please try again.');
+    }
   };
 
   const handleDownload = (ticketId) => {
     console.log('Download ticket:', ticketId);
-    // API call to download PDF
+    toast.info('Legacy download function - use new PDF buttons!');
   };
 
   const emptyStateStyle = {
@@ -290,6 +369,8 @@ export default function MyTickets() {
               <div style={headerCellStyle}>Flight / Route</div>
               <div style={headerCellStyle}>Date</div>
               <div style={headerCellStyle}>Class</div>
+              <div style={headerCellStyle}>Passenger</div>
+              <div style={headerCellStyle}>Amount</div>
               <div style={headerCellStyle}>Status</div>
               <div style={headerCellStyle}>Actions</div>
             </div>
@@ -302,10 +383,20 @@ export default function MyTickets() {
               }}>
                 <div style={cellStyle}>{ticket.id}</div>
                 <div style={cellStyle}>
-                  {ticket.flightNumber} — {ticket.route}
+                  <div>{ticket.flightNumber}</div>
+                  <div style={{ fontSize: '12px', color: '#6b7280' }}>{ticket.route}</div>
+                  {ticket.seat && (
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Seat: {ticket.seat}</div>
+                  )}
                 </div>
                 <div style={cellStyle}>{ticket.date}</div>
                 <div style={cellStyle}>{ticket.class}</div>
+                <div style={cellStyle}>
+                  {ticket.passengerName || 'N/A'}
+                </div>
+                <div style={cellStyle}>
+                  {ticket.totalAmount || 'N/A'}
+                </div>
                 <div>
                   <span style={getStatusBadge(ticket.status)}>
                     {ticket.status}

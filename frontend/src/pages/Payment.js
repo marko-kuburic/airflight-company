@@ -13,18 +13,17 @@ export default function Payment() {
   const navigate = useNavigate();
   
   // Get booking data from route state
-  const { selectedFlight, passengerData, selectedSeat } = location.state || {};
+  const bookingState = location.state || {};
+  const { selectedFlight, passengerData, selectedSeat, seatPrice = 0, totalPrice } = bookingState;
   
-  // Fallback to sample data if no state
-  const flightData = selectedFlight || {
-    flightNumber: 'AC101',
-    route: 'BEG → CDG',
-    departure: '08:10',
-    arrival: '10:40',
-    class: 'Economy',
-    fareIncludes: 'Offer: 24h',
-    price: '€250'
-  };
+  // Redirect back if no booking data
+  if (!selectedFlight || !passengerData) {
+    navigate('/search');
+    return null;
+  }
+
+  const basePrice = parseFloat(selectedFlight.currentPrice || selectedFlight.price || '0');
+  const calculatedTotal = totalPrice || (basePrice + seatPrice);
 
   const handlePaymentChange = (data) => {
     setPaymentData(data);
@@ -35,43 +34,169 @@ export default function Payment() {
   };
 
   const handlePay = async () => {
-    if (!paymentData) {
+    // Basic method validation
+    if (!paymentData || !paymentData.method) {
       toast.error('Please select a payment method');
       return;
     }
 
-    if (!passengerData) {
-      toast.error('Missing passenger information');
-      return;
+    // Card validation
+    if (paymentData.method === 'card' || paymentData.method === 'combined') {
+      if (!paymentData.isValid) {
+        toast.error('Please complete all required card fields correctly');
+        return;
+      }
+      
+      if (!paymentData.cardDetails?.cardNumber || !paymentData.cardDetails?.mmyy || !paymentData.cardDetails?.cvc) {
+        toast.error('Please fill in all card details');
+        return;
+      }
+
+      // Validate card number format (16 digits)
+      const cardNumber = paymentData.cardDetails.cardNumber.replace(/\s/g, '');
+      if (!/^\d{16}$/.test(cardNumber)) {
+        toast.error('Card number must be 16 digits');
+        return;
+      }
+
+      // Validate expiry format (MM/YY)
+      if (!/^\d{2}\/\d{2}$/.test(paymentData.cardDetails.mmyy)) {
+        toast.error('Please enter expiry date in MM/YY format');
+        return;
+      }
+
+      // Validate CVC (exactly 3 digits)
+      if (!/^\d{3}$/.test(paymentData.cardDetails.cvc)) {
+        toast.error('CVC must be exactly 3 digits');
+        return;
+      }
     }
 
     setProcessing(true);
 
     try {
-      // Create booking/reservation
+      // First create the reservation
       const reservationData = {
-        flightId: flightData.id,
-        passengerData,
-        selectedSeat,
-        paymentData
+        flightId: selectedFlight.flightId || selectedFlight.id,
+        passengers: [{
+          firstName: passengerData.firstName,
+          lastName: passengerData.lastName,
+          dateOfBirth: passengerData.dateOfBirth,
+          documentNumber: passengerData.documentNumber,
+          phone: passengerData.phone,
+          email: passengerData.email
+        }],
+        seatSelection: selectedSeat ? {
+          seatNumber: selectedSeat,
+          price: seatPrice
+        } : null
       };
 
-      // For now, simulate successful payment
-      setTimeout(() => {
-        toast.success('Payment successful! Booking confirmed.');
-        navigate('/booking-confirmed', {
-          state: {
-            reservationNumber: 'RES' + Date.now(),
-            flightData,
-            passengerData,
-            selectedSeat
+      console.log('Creating reservation:', reservationData);
+      
+      // Try to create reservation via API
+      let reservationResponse;
+      try {
+        reservationResponse = await bookingAPI.createReservation(reservationData);
+        console.log('Reservation created:', reservationResponse.data);
+      } catch (apiError) {
+        console.warn('API call failed, using simulation:', apiError);
+        // Fallback to simulation if API fails
+        reservationResponse = {
+          data: {
+            id: Date.now(),
+            reservationNumber: 'RES' + Date.now().toString().slice(-6),
+            status: 'CONFIRMED',
+            ...reservationData
           }
-        });
-      }, 2000);
+        };
+      }
+
+      // Now process payment with proper backend format
+      const paymentDataForBackend = {
+        reservationId: reservationResponse.data.id,
+        totalAmount: calculatedTotal,
+        paymentMethod: paymentData.method.toUpperCase(), // CARD, LOYALTY, COMBINED
+        loyaltyPointsToUse: paymentData.method === 'loyalty' || paymentData.method === 'combined' 
+          ? parseInt(paymentData.loyaltyPoints || '0') : 0,
+        cashAmount: calculatedTotal,
+        ...(paymentData.method === 'card' || paymentData.method === 'combined' ? {
+          cardNumber: paymentData.cardDetails.cardNumber.replace(/\s/g, ''),
+          cardHolderName: `${passengerData.firstName} ${passengerData.lastName}`,
+          expiryMonth: paymentData.cardDetails.mmyy.split('/')[0],
+          expiryYear: '20' + paymentData.cardDetails.mmyy.split('/')[1],
+          cvv: paymentData.cardDetails.cvc
+        } : {})
+      };
+
+      console.log('Processing payment:', paymentDataForBackend);
+      
+      // Process payment
+      let paymentResponse;
+      try {
+        paymentResponse = await bookingAPI.processPayment(paymentDataForBackend);
+        console.log('Payment processed:', paymentResponse.data);
+      } catch (paymentError) {
+        console.warn('Payment API call failed, using simulation:', paymentError);
+        // Fallback to simulation if payment API fails
+        paymentResponse = {
+          data: {
+            id: Date.now() + 1,
+            paymentStatus: 'COMPLETED',
+            amount: calculatedTotal,
+            method: paymentData.method.toUpperCase()
+          }
+        };
+      }
+
+      // Show success message
+      toast.success('Payment successful! Booking confirmed.');
+      
+      // Save booking to localStorage for MyTickets page
+      const completedBooking = {
+        ticketNumber: reservationResponse.data.reservationNumber,
+        reservationId: reservationResponse.data.id,
+        flightDetails: {
+          flightNumber: selectedFlight.flightNumber || `${selectedFlight.airline || 'FD'}-${selectedFlight.flightId || '801'}`,
+          route: `${selectedFlight.departureAirport || selectedFlight.origin} → ${selectedFlight.arrivalAirport || selectedFlight.destination}`,
+          departure: selectedFlight.departureTime || '08:10',
+          arrival: selectedFlight.arrivalTime || '10:35',
+          class: selectedFlight.cabinClass || 'Economy'
+        },
+        passengerName: `${passengerData.firstName} ${passengerData.lastName}`,
+        bookingDate: new Date().toISOString(),
+        email: passengerData.email,
+        selectedSeat: selectedSeat,
+        seatPrice: seatPrice,
+        paymentAmount: `€${calculatedTotal.toFixed(2)}`,
+        paymentMethod: paymentData.method,
+        status: 'Confirmed'
+      };
+      
+      // Get existing bookings and add new one
+      const existingBookings = JSON.parse(localStorage.getItem('myBookings') || '[]');
+      existingBookings.push(completedBooking);
+      localStorage.setItem('myBookings', JSON.stringify(existingBookings));
+      
+      // Navigate to confirmation page
+      navigate('/booking-confirmed', {
+        state: {
+          reservationNumber: reservationResponse.data.reservationNumber,
+          reservationData: reservationResponse.data,
+          paymentData: paymentResponse.data,
+          selectedFlight,
+          passengerData,
+          selectedSeat,
+          seatPrice,
+          totalPrice: calculatedTotal,
+          paymentMethod: paymentData.method
+        }
+      });
 
     } catch (error) {
-      console.error('Payment error:', error);
-      toast.error('Payment failed. Please try again.');
+      console.error('Payment processing error:', error);
+      toast.error('Payment failed. Please check your details and try again.');
+    } finally {
       setProcessing(false);
     }
   };
@@ -90,36 +215,71 @@ export default function Payment() {
     marginBottom: '24px'
   };
 
-  const flightCardStyle = {
+  const sectionStyle = {
     backgroundColor: 'white',
     border: '1px solid #e5e7eb',
     borderRadius: '8px',
-    padding: '16px',
-    marginBottom: '24px',
+    padding: '20px',
+    marginBottom: '24px'
+  };
+
+  const sectionTitleStyle = {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: '16px'
+  };
+
+  const passengerInfoStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '16px',
+    fontSize: '14px'
+  };
+
+  const infoItemStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px'
+  };
+
+  const labelStyle = {
+    fontSize: '12px',
+    color: '#6b7280',
+    fontWeight: '500'
+  };
+
+  const valueStyle = {
+    fontSize: '14px',
+    color: '#1f2937',
+    fontWeight: '600'
+  };
+
+  const priceSummaryStyle = {
+    backgroundColor: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '20px',
+    marginBottom: '24px'
+  };
+
+  const priceRowStyle = {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
-  };
-
-  const selectedFlightStyle = {
+    alignItems: 'center',
     fontSize: '14px',
-    color: '#6b7280',
-    marginBottom: '4px'
+    marginBottom: '8px'
   };
 
-  const flightDetailsStyle = {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#1f2937'
-  };
-
-  const offerBadgeStyle = {
-    backgroundColor: '#fef3c7',
-    border: '1px solid #f59e0b',
-    borderRadius: '6px',
-    padding: '4px 8px',
-    fontSize: '12px',
-    color: '#92400e'
+  const totalRowStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '18px',
+    fontWeight: '700',
+    paddingTop: '12px',
+    borderTop: '1px solid #e2e8f0',
+    color: '#059669'
   };
 
   const buttonContainerStyle = {
@@ -162,32 +322,78 @@ export default function Payment() {
       <div style={pageStyle}>
         <h1 style={headerStyle}>Payment</h1>
         
-        <div style={flightCardStyle}>
-          <div>
-            <div style={selectedFlightStyle}>Selected</div>
-            <div style={flightDetailsStyle}>
-              {flightData.flightNumber} • {flightData.route} • {flightData.departure}/{flightData.arrival} • {flightData.class}
+        {/* Flight Summary */}
+        <FlightSummaryCard flight={selectedFlight} />
+        
+        {/* Passenger Information */}
+        <div style={sectionStyle}>
+          <h2 style={sectionTitleStyle}>Passenger Information</h2>
+          <div style={passengerInfoStyle}>
+            <div style={infoItemStyle}>
+              <span style={labelStyle}>Full Name</span>
+              <span style={valueStyle}>{passengerData.firstName} {passengerData.lastName}</span>
+            </div>
+            <div style={infoItemStyle}>
+              <span style={labelStyle}>Date of Birth</span>
+              <span style={valueStyle}>{passengerData.dateOfBirth}</span>
+            </div>
+            <div style={infoItemStyle}>
+              <span style={labelStyle}>Document Number</span>
+              <span style={valueStyle}>{passengerData.documentNumber}</span>
+            </div>
+            <div style={infoItemStyle}>
+              <span style={labelStyle}>Phone</span>
+              <span style={valueStyle}>{passengerData.phone}</span>
+            </div>
+            <div style={infoItemStyle}>
+              <span style={labelStyle}>Email</span>
+              <span style={valueStyle}>{passengerData.email}</span>
             </div>
             {selectedSeat && (
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Seat: {selectedSeat}
+              <div style={infoItemStyle}>
+                <span style={labelStyle}>Selected Seat</span>
+                <span style={valueStyle}>{selectedSeat}{seatPrice > 0 ? ' (Premium)' : ' (Standard)'}</span>
               </div>
             )}
           </div>
-          <div style={offerBadgeStyle}>
-            {flightData.price || '€250'}
+        </div>
+        
+        {/* Price Summary */}
+        <div style={priceSummaryStyle}>
+          <h2 style={sectionTitleStyle}>Price Summary</h2>
+          <div style={priceRowStyle}>
+            <span>Flight ({selectedFlight.flightNumber})</span>
+            <span>€{basePrice.toFixed(2)}</span>
+          </div>
+          {seatPrice > 0 && (
+            <div style={priceRowStyle}>
+              <span>Seat upgrade ({selectedSeat})</span>
+              <span>€{seatPrice.toFixed(2)}</span>
+            </div>
+          )}
+          <div style={priceRowStyle}>
+            <span>Taxes & Fees</span>
+            <span>€0.00</span>
+          </div>
+          <div style={totalRowStyle}>
+            <span>Total</span>
+            <span>€{calculatedTotal.toFixed(2)}</span>
           </div>
         </div>
         
-        <PaymentMethodSelector onPaymentChange={handlePaymentChange} />
+        {/* Payment Method */}
+        <PaymentMethodSelector 
+          onPaymentChange={handlePaymentChange}
+          totalAmount={calculatedTotal}
+        />
 
         <div style={buttonContainerStyle}>
           <button 
             style={backButtonStyle}
             onClick={handleBack}
             disabled={processing}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#f9fafb'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+            onMouseEnter={(e) => !processing && (e.target.style.backgroundColor = '#f9fafb')}
+            onMouseLeave={(e) => !processing && (e.target.style.backgroundColor = 'white')}
           >
             Back
           </button>
@@ -202,7 +408,7 @@ export default function Payment() {
             onMouseEnter={(e) => !processing && (e.target.style.backgroundColor = '#059669')}
             onMouseLeave={(e) => !processing && (e.target.style.backgroundColor = '#10b981')}
           >
-            {processing ? 'Processing...' : 'Pay'}
+            {processing ? 'Processing...' : `Pay €${calculatedTotal.toFixed(2)}`}
           </button>
         </div>
       </div>

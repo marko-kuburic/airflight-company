@@ -5,7 +5,14 @@ export function BookingConfirmation({
   status, 
   flightDetails, 
   passengerName,
+  bookingReference,
+  paymentAmount,
+  email,
+  selectedSeat,
+  seatPrice,
+  paymentMethod,
   onDownloadTicket,
+  onDownloadBoardingPass,
   onGoToTickets 
 }) {
   const containerStyle = {
@@ -147,6 +154,39 @@ export function BookingConfirmation({
         </div>
         <div style={passengerLabelStyle}>Passenger</div>
         <div style={passengerNameStyle}>{passengerName}</div>
+        
+        {/* Additional booking details */}
+        {bookingReference && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={passengerLabelStyle}>Booking Reference</div>
+            <div style={passengerNameStyle}>{bookingReference}</div>
+          </div>
+        )}
+        
+        {selectedSeat && (
+          <div style={{ marginTop: '12px' }}>
+            <div style={passengerLabelStyle}>Selected Seat</div>
+            <div style={passengerNameStyle}>
+              {selectedSeat} {seatPrice > 0 && `(+€${seatPrice.toFixed(2)} premium)`}
+            </div>
+          </div>
+        )}
+        
+        {email && (
+          <div style={{ marginTop: '12px' }}>
+            <div style={passengerLabelStyle}>Email</div>
+            <div style={passengerNameStyle}>{email}</div>
+          </div>
+        )}
+        
+        {paymentAmount && (
+          <div style={{ marginTop: '12px' }}>
+            <div style={passengerLabelStyle}>Total Amount Paid</div>
+            <div style={{ ...passengerNameStyle, fontWeight: '600', color: '#10b981' }}>
+              {paymentAmount} {paymentMethod && `(${paymentMethod})`}
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={buttonContainerStyle}>
@@ -156,7 +196,15 @@ export function BookingConfirmation({
           onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
           onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
         >
-          Download e-ticket (PDF)
+          📄 Download e-ticket (PDF)
+        </button>
+        <button 
+          style={{...downloadButtonStyle, backgroundColor: '#10b981', marginLeft: '12px'}}
+          onClick={onDownloadBoardingPass}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+        >
+          🎫 Download Boarding Pass
         </button>
         <button 
           style={ticketsButtonStyle}

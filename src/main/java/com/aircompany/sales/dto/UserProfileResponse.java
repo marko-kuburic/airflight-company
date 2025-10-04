@@ -13,6 +13,8 @@ public class UserProfileResponse {
     private String email;
     private String phone;
     private String address;
+    private String dateOfBirth;
+    private String preferredLanguage;
     private LocalDateTime createdAt;
     
     // Loyalty information
@@ -27,6 +29,8 @@ public class UserProfileResponse {
         this.lastName = customer.getLastName();
         this.email = customer.getEmail();
         this.phone = customer.getPhone();
+        this.dateOfBirth = customer.getDateOfBirth();
+        this.preferredLanguage = customer.getPreferredLanguage();
         // this.address = customer.getAddress();
         this.createdAt = customer.getCreatedAt();
         
@@ -98,6 +102,22 @@ public class UserProfileResponse {
     
     public void setLoyalty(LoyaltyInfo loyalty) {
         this.loyalty = loyalty;
+    }
+    
+    public String getDateOfBirth() {
+        return dateOfBirth;
+    }
+    
+    public void setDateOfBirth(String dateOfBirth) {
+        this.dateOfBirth = dateOfBirth;
+    }
+    
+    public String getPreferredLanguage() {
+        return preferredLanguage;
+    }
+    
+    public void setPreferredLanguage(String preferredLanguage) {
+        this.preferredLanguage = preferredLanguage;
     }
     
     // Nested class for loyalty information

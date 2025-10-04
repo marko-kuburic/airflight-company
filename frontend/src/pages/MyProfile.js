@@ -3,7 +3,7 @@ import { Layout } from '../components/Layout';
 import { ProfileForm } from '../components/ProfileForm';
 import { SavedPaymentMethods } from '../components/SavedPaymentMethods';
 import { RecentPurchases } from '../components/RecentPurchases';
-import { authAPI, bookingAPI } from '../services/api';
+import { authAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -21,7 +21,6 @@ export default function MyProfile() {
   const loadProfileData = async () => {
     setIsLoading(true);
     try {
-      // Get user data from localStorage
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       
       if (!userData.id) {
@@ -30,37 +29,47 @@ export default function MyProfile() {
         return;
       }
 
-      // Set the current user data
-      setProfileData({
-        firstName: userData.firstName || '',
-        lastName: userData.lastName || '',
-        email: userData.email || '',
-        phone: userData.phone || '',
-        userId: userData.id
-      });
-
-      // Load user's recent purchases/reservations
+      // Get fresh profile data from backend
       try {
-        const reservationsResponse = await bookingAPI.getReservationsByCustomer(userData.id);
-        const reservations = reservationsResponse.data || [];
+        const profileResponse = await authAPI.getUserProfile(userData.id);
+        setProfileData(profileResponse.data);
+      } catch (error) {
+        console.warn('Backend profile not available, using localStorage:', error);
+        // Fallback to localStorage data
+        setProfileData({
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          userId: userData.id,
+          id: userData.id
+        });
+      }
+
+      // Load payment methods from backend
+      try {
+        const paymentResponse = await authAPI.getUserPaymentMethods(userData.id);
+        setPaymentMethods(paymentResponse.data || []);
+      } catch (error) {
+        setPaymentMethods([]);
+      }
+
+      // Load recent purchases from backend
+      try {
+        const reservationsResponse = await authAPI.getUserReservations(userData.id);
+        const reservations = reservationsResponse.data?.reservations || [];
         
-        // Transform reservations to recent purchases format
         const purchases = reservations.map(reservation => ({
           ticketNumber: reservation.reservationNumber || `RES-${reservation.id}`,
           status: reservation.status || 'Confirmed',
-          flightNumber: reservation.flightNumber || 'N/A',
+          flightCode: reservation.flightNumber || 'N/A',
           date: reservation.date || new Date().toISOString().split('T')[0]
         }));
         
         setRecentPurchases(purchases);
       } catch (error) {
-        console.log('No recent purchases found');
         setRecentPurchases([]);
       }
-
-      // For now, use empty payment methods (would come from a real API)
-      setPaymentMethods([]);
-      
     } catch (error) {
       console.error('Error loading profile data:', error);
       toast.error('Error loading profile data');
@@ -69,130 +78,171 @@ export default function MyProfile() {
     }
   };
 
-  const handleProfileSave = async (formData) => {
-    setIsLoading(true);
+  const handleProfileUpdate = async (updatedData) => {
     try {
+      setIsLoading(true);
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       
       if (!userData.id) {
         toast.error('Please log in to update your profile');
-        navigate('/login');
         return;
       }
 
-      // Update user profile via API
-      const response = await authAPI.updateUserProfile(userData.id, formData);
+      const response = await authAPI.updateUserProfile(userData.id, updatedData);
+      setProfileData(response.data);
       
-      if (response.data) {
-        // Update localStorage with new data
-        const updatedUser = { ...userData, ...formData };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        
-        setProfileData({ ...profileData, ...formData });
-        toast.success('Profile updated successfully!');
-      }
+      const updatedUser = { ...userData, ...response.data };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
       
+      toast.success('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Error updating profile. Please try again.');
+      toast.error('Failed to update profile');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAddCard = () => {
-    // In real app, open modal or navigate to add card page
-    console.log('Add new card');
-    alert('Add new card functionality would open here');
-  };
-
-  const handleRemoveCard = async (cardId) => {
+  const handlePaymentMethodSave = async (paymentMethodData) => {
     try {
-      // In real app, call API to remove card
-      // await fetch(`/api/user/payment-methods/${cardId}`, {
-      //   method: 'DELETE'
-      // });
+      setIsLoading(true);
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
       
-      console.log('Remove card:', cardId);
-      setPaymentMethods(prev => prev.filter(card => card.id !== cardId));
-      alert('Payment method removed successfully!');
-      
+      if (!userData.id) {
+        toast.error('Please log in to save payment methods');
+        return;
+      }
+
+      await authAPI.savePaymentMethod(userData.id, paymentMethodData);
+      await loadPaymentMethods();
+      toast.success('Payment method saved successfully!');
     } catch (error) {
-      console.error('Error removing card:', error);
-      alert('Error removing payment method. Please try again.');
+      console.error('Error saving payment method:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to save payment method';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const pageStyle = {
-    padding: '24px',
-    fontFamily: 'Inter, sans-serif'
+  const handlePaymentMethodDelete = async (paymentMethodId) => {
+    try {
+      setIsLoading(true);
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!userData.id) {
+        toast.error('Please log in to delete payment methods');
+        return;
+      }
+
+      await authAPI.deletePaymentMethod(userData.id, paymentMethodId);
+      await loadPaymentMethods();
+      toast.success('Payment method deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting payment method:', error);
+      toast.error('Failed to delete payment method');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const headerStyle = {
-    fontSize: '24px',
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: '24px'
+  const loadPaymentMethods = async () => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      if (userData.id) {
+        const response = await authAPI.getUserPaymentMethods(userData.id);
+        setPaymentMethods(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading payment methods:', error);
+    }
   };
-
-  const contentGridStyle = {
-    display: 'grid',
-    gridTemplateColumns: '2fr 1fr',
-    gap: '24px'
-  };
-
-  const leftColumnStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '24px'
-  };
-
-  const rightColumnStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '24px'
-  };
-
-  if (isLoading && !profileData) {
-    return (
-      <Layout>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '400px',
-          fontSize: '16px',
-          color: '#6b7280'
-        }}>
-          Loading profile...
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
-      <div style={pageStyle}>
-        <h1 style={headerStyle}>Profile</h1>
-        
-        <div style={contentGridStyle}>
-          <div style={leftColumnStyle}>
-            <ProfileForm
-              profileData={profileData}
-              onSave={handleProfileSave}
-              isLoading={isLoading}
-            />
-            
-            <SavedPaymentMethods
-              paymentMethods={paymentMethods}
-              onAddCard={handleAddCard}
-              onRemoveCard={handleRemoveCard}
-            />
-          </div>
-          
-          <div style={rightColumnStyle}>
-            <RecentPurchases purchases={recentPurchases} />
-          </div>
+      <div style={{
+        padding: '24px',
+        fontFamily: 'Inter, sans-serif',
+        backgroundColor: '#f8fafc',
+        minHeight: '100vh'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto'
+        }}>
+          <h1 style={{
+            fontSize: '28px',
+            fontWeight: '600',
+            color: '#1f2937',
+            marginBottom: '32px'
+          }}>
+            Profile
+          </h1>
+
+          {isLoading ? (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '40px',
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <p style={{ color: '#6b7280' }}>Loading profile...</p>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: '24px'
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb',
+                padding: '24px'
+              }}>
+                <ProfileForm 
+                  profileData={profileData}
+                  onUpdate={handleProfileUpdate}
+                  isLoading={isLoading}
+                />
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '24px'
+              }}>
+                <div style={{
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  padding: '24px'
+                }}>
+                  <SavedPaymentMethods 
+                    paymentMethods={paymentMethods}
+                    onAddCard={handlePaymentMethodSave}
+                    onRemoveCard={handlePaymentMethodDelete}
+                    isLoading={isLoading}
+                  />
+                </div>
+
+                <div style={{
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  padding: '24px'
+                }}>
+                  <RecentPurchases 
+                    purchases={recentPurchases}
+                    onViewTickets={() => navigate('/tickets')}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

@@ -84,6 +84,18 @@ public class FlightDataInitializer implements CommandLineRunner {
         System.out.println("Clearing routes...");
         entityManager.createQuery("DELETE FROM Route").executeUpdate();
         
+        System.out.println("Clearing airports...");
+        entityManager.createQuery("DELETE FROM Airport").executeUpdate();
+        
+        System.out.println("Clearing aircraft...");
+        entityManager.createQuery("DELETE FROM Aircraft").executeUpdate();
+        
+        System.out.println("Clearing cabin classes...");
+        entityManager.createQuery("DELETE FROM CabinClass").executeUpdate();
+        
+        System.out.println("Clearing countries...");
+        entityManager.createQuery("DELETE FROM Country").executeUpdate();
+        
         entityManager.flush();
         System.out.println("✓ Old data cleared successfully");
     }

@@ -42,7 +42,7 @@ export const OfferTimer = ({ flight, onOfferRefresh }) => {
     const handleRefresh = async () => {
         setIsRefreshing(true);
         try {
-            const response = await flightAPI.refreshOffer(flight.id);
+            const response = await flightAPI.refreshOffer(flight.flightId);
             
             if (response.data.success) {
                 toast.success('Offer refreshed with new pricing!');

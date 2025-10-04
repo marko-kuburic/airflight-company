@@ -9,6 +9,10 @@ import toast from 'react-hot-toast';
 export default function BookingDetails() {
   const [passengerData, setPassengerData] = useState(null);
   const [selectedSeat, setSelectedSeat] = useState(null);
+  const [seatPrice, setSeatPrice] = useState(0);
+  const [isFormValid, setIsFormValid] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -27,8 +31,17 @@ export default function BookingDetails() {
     setPassengerData(data);
   };
 
-  const handleSeatSelection = (seatNumber) => {
+  const handleFormValidation = (isValid, errors) => {
+    setIsFormValid(isValid);
+    setFormErrors(errors);
+  };
+
+  const handleSeatSelection = (seatNumber, seatInfo) => {
     setSelectedSeat(seatNumber);
+  };
+
+  const handleSeatPriceChange = (price) => {
+    setSeatPrice(price);
   };
 
   const handleBackToResults = () => {
@@ -36,9 +49,27 @@ export default function BookingDetails() {
   };
 
   const handleContinue = () => {
-    if (!passengerData) {
-      toast.error('Please fill in passenger details');
-      return;
+    setShowValidationErrors(true);
+    
+    // Check form validation
+    if (!isFormValid || !passengerData) {
+      const missingFields = [];
+      if (!passengerData?.firstName) missingFields.push('First Name');
+      if (!passengerData?.lastName) missingFields.push('Last Name');
+      if (!passengerData?.dateOfBirth) missingFields.push('Date of Birth');
+      if (!passengerData?.documentNumber) missingFields.push('Document Number');
+      if (!passengerData?.phone) missingFields.push('Phone');
+      if (!passengerData?.email) missingFields.push('Email');
+      
+      if (missingFields.length > 0) {
+        toast.error(`Please fill in the following required fields: ${missingFields.join(', ')}`);
+        return;
+      }
+      
+      if (Object.keys(formErrors).length > 0) {
+        toast.error('Please fix the validation errors in the form');
+        return;
+      }
     }
 
     if (!selectedSeat) {
@@ -46,12 +77,18 @@ export default function BookingDetails() {
       return;
     }
 
+    // Calculate total price
+    const basePrice = parseFloat(selectedFlight.currentPrice || selectedFlight.price || '0');
+    const totalPrice = basePrice + seatPrice;
+
     // Navigate to payment with all booking data
     navigate('/payment', { 
       state: { 
         selectedFlight,
         passengerData,
-        selectedSeat
+        selectedSeat,
+        seatPrice,
+        totalPrice
       } 
     });
   };
@@ -135,12 +172,19 @@ export default function BookingDetails() {
         <div style={mainContentStyle}>
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Passenger Information</h2>
-            <PassengerDetailsForm onFormChange={handlePassengerFormChange} />
+            <PassengerDetailsForm 
+              passengerData={passengerData}
+              onFormChange={handlePassengerFormChange}
+              onValidationChange={handleFormValidation}
+            />
           </div>
           
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Seat Selection</h2>
-            <SeatSelection onSeatSelect={handleSeatSelection} />
+            <SeatSelection 
+              onSeatSelect={handleSeatSelection}
+              onPriceChange={handleSeatPriceChange}
+            />
           </div>
         </div>
 
@@ -154,12 +198,27 @@ export default function BookingDetails() {
             Back to Results
           </button>
           <button 
-            style={continueButtonStyle}
+            style={{
+              ...continueButtonStyle,
+              backgroundColor: (!isFormValid || !selectedSeat) && showValidationErrors ? '#dc2626' : '#2563eb'
+            }}
             onClick={handleContinue}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
+            onMouseEnter={(e) => {
+              if ((!isFormValid || !selectedSeat) && showValidationErrors) {
+                e.target.style.backgroundColor = '#b91c1c';
+              } else {
+                e.target.style.backgroundColor = '#1d4ed8';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if ((!isFormValid || !selectedSeat) && showValidationErrors) {
+                e.target.style.backgroundColor = '#dc2626';
+              } else {
+                e.target.style.backgroundColor = '#2563eb';
+              }
+            }}
           >
-            Continue
+            {(!isFormValid || !selectedSeat) && showValidationErrors ? 'Please Complete Required Fields' : 'Continue'}
           </button>
         </div>
       </div>

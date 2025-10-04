@@ -7,7 +7,11 @@ import { SearchDropdown } from "./SearchDropdown";
 export function SearchBar({ onSearchResults }) {
   const [from, setFrom] = useState("Anywhere");
   const [to, setTo] = useState("Anywhere");
-  const [date, setDate] = useState("2025-09-10");
+  // Set default date to today's date
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+  });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
