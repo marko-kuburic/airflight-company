@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -28,6 +29,9 @@ public class UserService {
     
     @Autowired
     private SavedPaymentMethodRepository savedPaymentMethodRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
     
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -81,6 +85,8 @@ public class UserService {
         profile.setLastName(customer.getLastName());
         profile.setEmail(customer.getEmail());
         profile.setPhone(customer.getPhone());
+        profile.setDateOfBirth(customer.getDateOfBirth());
+        profile.setPreferredLanguage(customer.getPreferredLanguage());
         
         // Get loyalty info
         Optional<Loyalty> loyaltyOpt = loyaltyRepository.findByCustomer(customer);
@@ -214,5 +220,134 @@ public class UserService {
     
     public List<Reservation> getUserReservations(Long userId) {
         return List.of();
+    }
+    
+    public Optional<LoyaltyResponse> getUserLoyaltyData(Long userId) {
+        Optional<Customer> customerOpt = customerRepository.findById(userId);
+        if (customerOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        
+        Customer customer = customerOpt.get();
+        Optional<Loyalty> loyaltyOpt = loyaltyRepository.findByCustomer(customer);
+        
+        if (loyaltyOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        
+        Loyalty loyalty = loyaltyOpt.get();
+        
+        // Return loyalty response without earning history for simplicity
+        // Earning history implementation would require complex joins across multiple tables
+        List<LoyaltyResponse.EarningHistoryItem> emptyHistory = new ArrayList<>();
+        
+        return Optional.of(new LoyaltyResponse(loyalty, emptyHistory));
+    }
+    
+    /**
+     * Award points for a completed reservation
+     * This should be called when a reservation status changes to COMPLETED
+     */
+    public void awardPointsForReservation(Long customerId, Long reservationId) {
+        Optional<Customer> customerOpt = customerRepository.findById(customerId);
+        if (customerOpt.isEmpty()) {
+            return;
+        }
+        
+        Customer customer = customerOpt.get();
+        Optional<Loyalty> loyaltyOpt = loyaltyRepository.findByCustomer(customer);
+        
+        if (loyaltyOpt.isEmpty()) {
+            return;
+        }
+        
+        Loyalty loyalty = loyaltyOpt.get();
+        Loyalty.LoyaltyTier oldTier = loyalty.getTier();
+        
+        // Calculate points for this reservation
+        int pointsToAward = 750; // Simplified - in real system would calculate based on flight details
+        String reservationNumber = "RES-" + reservationId;
+        
+        // Add points to loyalty account
+        loyalty.setPoints(loyalty.getPoints() + pointsToAward);
+        
+        // Update tier if necessary
+        updateTierBasedOnPoints(loyalty);
+        
+        // Save updated loyalty
+        loyaltyRepository.save(loyalty);
+        
+        // Create real notifications for the reservation
+        notificationService.notifyPointsCredited(customerId, pointsToAward, "Reservation " + reservationNumber + " completed");
+        
+        // Check for tier upgrade
+        if (!oldTier.equals(loyalty.getTier())) {
+            notificationService.notifyTierUpgrade(customerId, loyalty.getTier().toString());
+        }
+        
+        // Create ticket confirmation notification
+        notificationService.notifyTicketIssued(customerId, "TCK-" + reservationId);
+    }
+    
+    /**
+     * Award manual points (for admin/testing purposes)
+     */
+    public void awardManualPoints(Long customerId, int points, String reason) {
+        Optional<Customer> customerOpt = customerRepository.findById(customerId);
+        if (customerOpt.isEmpty()) {
+            throw new RuntimeException("Customer not found");
+        }
+        
+        Customer customer = customerOpt.get();
+        Loyalty loyalty = loyaltyRepository.findByCustomer(customer)
+            .orElseGet(() -> {
+                Loyalty newLoyalty = new Loyalty();
+                newLoyalty.setCustomer(customer);
+                newLoyalty.setPoints(0);
+                newLoyalty.setTier(Loyalty.LoyaltyTier.BRONZE);
+                return loyaltyRepository.save(newLoyalty);
+            });
+        
+        // Store old tier to check for upgrades
+        Loyalty.LoyaltyTier oldTier = loyalty.getTier();
+        
+        // Add points
+        loyalty.setPoints(loyalty.getPoints() + points);
+        
+        // Update tier if necessary
+        updateTierBasedOnPoints(loyalty);
+        
+        // Save updated loyalty
+        loyaltyRepository.save(loyalty);
+        
+        // Create notifications
+        if (points > 0) {
+            // Notify about points credited
+            notificationService.notifyPointsCredited(customerId, points, reason);
+            
+            // Check for tier upgrade
+            if (!oldTier.equals(loyalty.getTier())) {
+                notificationService.notifyTierUpgrade(customerId, loyalty.getTier().toString());
+            }
+        }
+        
+        // Log the manual point award
+        System.out.println("Manually awarded " + points + " points to customer " + customerId + " for: " + reason);
+    }
+    
+    private void updateTierBasedOnPoints(Loyalty loyalty) {
+        int points = loyalty.getPoints();
+        
+        if (points >= 100000) {
+            loyalty.setTier(Loyalty.LoyaltyTier.DIAMOND);
+        } else if (points >= 50000) {
+            loyalty.setTier(Loyalty.LoyaltyTier.PLATINUM);
+        } else if (points >= 25000) {
+            loyalty.setTier(Loyalty.LoyaltyTier.GOLD);
+        } else if (points >= 10000) {
+            loyalty.setTier(Loyalty.LoyaltyTier.SILVER);
+        } else {
+            loyalty.setTier(Loyalty.LoyaltyTier.BRONZE);
+        }
     }
 }

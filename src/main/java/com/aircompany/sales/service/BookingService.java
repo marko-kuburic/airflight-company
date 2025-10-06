@@ -40,6 +40,12 @@ public class BookingService {
     @Autowired
     private LoyaltyService loyaltyService;
     
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private NotificationService notificationService;
+    
     /**
      * Complete booking process: create reservation with tickets
      */
@@ -122,6 +128,13 @@ public class BookingService {
             // Award loyalty points for purchase
             awardLoyaltyPoints(reservation);
             
+            // Create reservation confirmation notification
+            notificationService.createNotification(
+                reservation.getCustomer().getId(),
+                String.format("Reservation %s confirmed! Your booking is complete.", reservation.getReservationNumber()),
+                com.aircompany.hr.model.Notification.NotificationType.GENERAL
+            );
+            
         } else {
             payment.setStatus(Payment.PaymentStatus.FAILED);
         }
@@ -131,6 +144,40 @@ public class BookingService {
         
         logger.info("Payment processed with status: {}", payment.getStatus());
         return payment;
+    }
+    
+    /**
+     * Complete a flight - called when flight actually completes
+     * This awards additional points and updates reservation status
+     */
+    public void completeFlightForReservation(Long reservationId) {
+        logger.info("Completing flight for reservation ID: {}", reservationId);
+        
+        Reservation reservation = reservationRepository.findById(reservationId)
+            .orElseThrow(() -> new RuntimeException("Reservation not found"));
+        
+        if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+            throw new RuntimeException("Cannot complete flight for non-confirmed reservation");
+        }
+        
+        // Update reservation status to completed
+        reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
+        
+        // Update all tickets to completed
+        reservation.getTickets().forEach(ticket -> 
+            ticket.setStatus(Ticket.TicketStatus.USED));
+        
+        // Award loyalty points for flight completion
+        try {
+            userService.awardPointsForReservation(reservation.getCustomer().getId(), reservation.getId());
+            logger.info("Awarded flight completion points for reservation: {}", reservation.getReservationNumber());
+        } catch (Exception e) {
+            logger.error("Failed to award flight completion points for reservation {}: {}", 
+                reservation.getReservationNumber(), e.getMessage());
+        }
+        
+        reservationRepository.save(reservation);
+        logger.info("Flight completed for reservation: {}", reservation.getReservationNumber());
     }
     
     /**
@@ -271,12 +318,13 @@ public class BookingService {
     }
     
     private void awardLoyaltyPoints(Reservation reservation) {
-        // Award 1 point per dollar spent
-        BigDecimal totalAmount = calculateTotalAmount(reservation);
-        int pointsToAward = totalAmount.intValue();
-        
-        if (pointsToAward > 0) {
-            loyaltyService.addPoints(reservation.getCustomer().getId(), pointsToAward);
+        // Use UserService's comprehensive point awarding system
+        try {
+            userService.awardPointsForReservation(reservation.getCustomer().getId(), reservation.getId());
+            logger.info("Awarded loyalty points for reservation: {}", reservation.getReservationNumber());
+        } catch (Exception e) {
+            logger.error("Failed to award loyalty points for reservation {}: {}", 
+                reservation.getReservationNumber(), e.getMessage());
         }
     }
     

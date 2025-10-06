@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export function ProfileForm({ profileData, onSave, isLoading = false }) {
+  console.log('ProfileForm received profileData:', JSON.stringify(profileData, null, 2));
+  
   const [formData, setFormData] = useState({
     firstName: profileData?.firstName || '',
     lastName: profileData?.lastName || '',
@@ -11,6 +13,26 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
   });
 
   const [isEditing, setIsEditing] = useState(false);
+
+  // Update form data when profileData changes
+  useEffect(() => {
+    console.log('ProfileData prop changed to:', JSON.stringify(profileData, null, 2));
+    if (profileData) {
+      const newFormData = {
+        firstName: profileData.firstName || '',
+        lastName: profileData.lastName || '',
+        email: profileData.email || '',
+        phone: profileData.phone || '',
+        dateOfBirth: profileData.dateOfBirth || '',
+        preferredLanguage: profileData.preferredLanguage || ''
+      };
+      console.log('Updating formData to:', JSON.stringify(newFormData, null, 2));
+      setFormData(newFormData);
+    }
+  }, [profileData]);
+  
+  console.log('isEditing state:', isEditing);
+  console.log('formData:', formData);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -24,9 +46,16 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
   };
 
   const handleSave = async () => {
+    console.log('=== SAVING PROFILE ===');
+    console.log('Current formData being saved:', JSON.stringify(formData, null, 2));
     if (onSave) {
-      await onSave(formData);
-      setIsEditing(false);
+      try {
+        const result = await onSave(formData);
+        console.log('Save completed, result:', result);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('Error saving profile:', error);
+      }
     }
   };
 
@@ -130,6 +159,7 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
 
   return (
     <div style={containerStyle}>
+
       <div style={formGridStyle}>
         <div style={formGroupStyle}>
           <label style={labelStyle}>First Name</label>
@@ -181,30 +211,70 @@ export function ProfileForm({ profileData, onSave, isLoading = false }) {
 
       <div style={{ marginBottom: '16px' }}>
         <label style={labelStyle}>Date of Birth</label>
-        <input
-          type="date"
-          value={formData.dateOfBirth}
-          onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-          style={inputStyle}
-          disabled={!isEditing}
-        />
+        {isEditing ? (
+          <input
+            type="date"
+            value={formData.dateOfBirth}
+            onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+            style={inputStyle}
+          />
+        ) : (
+          <div style={{
+            ...inputStyle,
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: '#f9fafb',
+            color: formData.dateOfBirth ? '#374151' : '#9ca3af',
+            fontStyle: formData.dateOfBirth ? 'normal' : 'italic'
+          }}>
+            {formData.dateOfBirth ? 
+              new Date(formData.dateOfBirth).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }) : 
+              'Not specified'
+            }
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: '16px' }}>
         <label style={labelStyle}>Preferred Language</label>
-        <select
-          value={formData.preferredLanguage}
-          onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
-          style={inputStyle}
-          disabled={!isEditing}
-        >
-          <option value="">Select language</option>
-          <option value="en">English</option>
-          <option value="sr">Serbian</option>
-          <option value="de">German</option>
-          <option value="fr">French</option>
-          <option value="es">Spanish</option>
-        </select>
+        {isEditing ? (
+          <select
+            value={formData.preferredLanguage}
+            onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">Select language</option>
+            <option value="en">English</option>
+            <option value="sr">Serbian</option>
+            <option value="de">German</option>
+            <option value="fr">French</option>
+            <option value="es">Spanish</option>
+          </select>
+        ) : (
+          <div style={{
+            ...inputStyle,
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: '#f9fafb',
+            color: formData.preferredLanguage ? '#374151' : '#9ca3af',
+            fontStyle: formData.preferredLanguage ? 'normal' : 'italic'
+          }}>
+            {formData.preferredLanguage ? (() => {
+              const languages = {
+                'en': 'English',
+                'sr': 'Serbian',
+                'de': 'German',
+                'fr': 'French',
+                'es': 'Spanish'
+              };
+              return languages[formData.preferredLanguage] || formData.preferredLanguage;
+            })() : 'Not specified'}
+          </div>
+        )}
       </div>
 
       <div style={buttonContainerStyle}>

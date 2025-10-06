@@ -70,6 +70,11 @@ export const authAPI = {
   getUserReservations: (userId) => api.get(`/users/${userId}/reservations`),
   getUserLoyalty: (userId) => api.get(`/users/${userId}/loyalty`),
   
+  // Notifications
+  getUserNotifications: (userId) => api.get(`/users/${userId}/notifications`),
+  markNotificationAsRead: (userId, notificationId) => api.put(`/users/${userId}/notifications/${notificationId}/read`),
+  markAllNotificationsAsRead: (userId) => api.put(`/users/${userId}/notifications/read-all`),
+  
   // Payment methods
   getUserPaymentMethods: (userId) => api.get(`/users/${userId}/payment-methods`),
   savePaymentMethod: (userId, data) => api.post(`/users/${userId}/payment-methods`, data),

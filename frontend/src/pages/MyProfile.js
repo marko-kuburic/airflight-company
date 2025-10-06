@@ -31,11 +31,20 @@ export default function MyProfile() {
 
       // Get fresh profile data from backend
       try {
+        console.log('Calling getUserProfile for userId:', userData.id);
         const profileResponse = await authAPI.getUserProfile(userData.id);
+        console.log('Profile API response:', JSON.stringify(profileResponse.data, null, 2));
         setProfileData(profileResponse.data);
       } catch (error) {
-        console.warn('Backend profile not available, using localStorage:', error);
+        console.error('Backend profile API call failed:', error);
+        console.error('Error details:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data
+        });
         // Fallback to localStorage data
+        console.warn('Using localStorage fallback data');
         setProfileData({
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
@@ -79,17 +88,27 @@ export default function MyProfile() {
   };
 
   const handleProfileUpdate = async (updatedData) => {
+    console.log('=== HANDLE PROFILE UPDATE CALLED ===');
+    console.log('updatedData:', updatedData);
+    
     try {
       setIsLoading(true);
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      console.log('userData from localStorage:', userData);
       
       if (!userData.id) {
+        console.error('No user ID found!');
         toast.error('Please log in to update your profile');
         return;
       }
 
+      console.log('Making API call to update profile...');
       const response = await authAPI.updateUserProfile(userData.id, updatedData);
+      console.log('API response received:', response);
+      console.log('API response data:', JSON.stringify(response.data, null, 2));
+      
       setProfileData(response.data);
+      console.log('ProfileData state updated with:', JSON.stringify(response.data, null, 2));
       
       const updatedUser = { ...userData, ...response.data };
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -205,7 +224,7 @@ export default function MyProfile() {
               }}>
                 <ProfileForm 
                   profileData={profileData}
-                  onUpdate={handleProfileUpdate}
+                  onSave={handleProfileUpdate}
                   isLoading={isLoading}
                 />
               </div>

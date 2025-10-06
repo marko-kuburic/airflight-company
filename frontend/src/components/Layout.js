@@ -16,7 +16,13 @@ export function Layout({ children }) {
         overflow: 'auto',
         height: '100vh'
       }}>
-        {children}
+        <div style={{ 
+          width: '100%', 
+          margin: '0', 
+          padding: '0' 
+        }}>
+          {children}
+        </div>
       </main>
     </div>
   );

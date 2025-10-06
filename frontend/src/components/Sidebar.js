@@ -1,5 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import toast from 'react-hot-toast';
 
 // Simple utility function to combine class names
 const cn = (...classes) => {
@@ -23,7 +24,7 @@ const X = ({ size = 24 }) => (
 );
 
 const navItems = [
-  { label: 'Customer Panel', path: '/', variant: 'primary' },
+  { label: 'Customer Panel', path: '/', variant: 'primary', disabled: true },
   { label: 'Search Flights', path: '/search' },
   { label: 'My Tickets', path: '/tickets' },
   { label: 'My Profile', path: '/profile' },
@@ -33,7 +34,25 @@ const navItems = [
 
 export function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleLogout = () => {
+    try {
+      // Clear user data from localStorage
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      
+      // Show success message
+      toast.success('Logged out successfully!');
+      
+      // Redirect to login page
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Error during logout');
+    }
+  };
 
   const sidebarContent = (
     <>
@@ -47,6 +66,7 @@ export function Sidebar() {
         {navItems.map((item, index) => {
           const isActive = location.pathname === item.path;
           const isPrimary = item.variant === 'primary';
+          const isDisabled = item.disabled;
           
           let buttonStyle = {
             borderRadius: '12px',
@@ -60,16 +80,17 @@ export function Sidebar() {
             transition: 'all 0.2s ease',
             fontFamily: 'Inter, sans-serif',
             border: 'none',
-            cursor: 'pointer'
+            cursor: isDisabled ? 'not-allowed' : 'pointer'
           };
 
           if (isPrimary) {
             buttonStyle = {
               ...buttonStyle,
-              backgroundColor: '#2563eb',
+              backgroundColor: isDisabled ? '#6b7280' : '#2563eb',
               color: 'white',
               fontWeight: 'bold',
-              borderRadius: '12px'
+              borderRadius: '12px',
+              opacity: isDisabled ? 0.6 : 1
             };
           } else if (isActive) {
             buttonStyle = {
@@ -91,6 +112,17 @@ export function Sidebar() {
             };
           }
           
+          if (isDisabled) {
+            return (
+              <div
+                key={item.path + index}
+                style={buttonStyle}
+              >
+                {item.label}
+              </div>
+            );
+          }
+          
           return (
             <Link
               key={item.path + index}
@@ -109,22 +141,24 @@ export function Sidebar() {
         padding: '10px',
         paddingBottom: '10px'
       }}>
-        <button style={{
-          width: '100%',
-          borderRadius: '10px',
-          height: '40px',
-          backgroundColor: '#dc2626',
-          color: 'white',
-          fontWeight: 'bold',
-          fontSize: '14px',
-          textDecoration: 'underline',
-          transition: 'opacity 0.2s ease',
-          border: 'none',
-          cursor: 'pointer',
-          fontFamily: 'Inter, sans-serif'
-        }}
-        onMouseEnter={(e) => e.target.style.opacity = '0.9'}
-        onMouseLeave={(e) => e.target.style.opacity = '1'}
+        <button 
+          style={{
+            width: '100%',
+            borderRadius: '10px',
+            height: '40px',
+            backgroundColor: '#dc2626',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            textDecoration: 'underline',
+            transition: 'opacity 0.2s ease',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'Inter, sans-serif'
+          }}
+          onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+          onMouseLeave={(e) => e.target.style.opacity = '1'}
+          onClick={handleLogout}
         >
           Logout
         </button>
@@ -174,7 +208,7 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         style={{
-          width: '220px',
+          width: '280px',
           height: '100vh',
           backgroundColor: '#1f2937',
           flexShrink: 0,

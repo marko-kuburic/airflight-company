@@ -62,89 +62,79 @@ export default function MyTickets() {
         }
       }
       
-      // If no tickets found, show sample data
-      if (allTickets.length === 0) {
-        allTickets = [
-          {
-            id: 'TCK-SAMPLE',
-            flightNumber: 'AC101',
-            route: 'BEG → CDG',
-            date: '2025-10-15',
-            class: 'Economy',
-            status: 'Confirmed',
-            passengerName: 'Sample Passenger',
-            totalAmount: '€142.00'
-          }
-        ];
-      }
-      
       setTickets(allTickets);
     } catch (error) {
       console.error('Error loading tickets:', error);
-      // Use sample data as fallback
-      setTickets([
-        {
-          id: 'TCK-SAMPLE',
-          flightNumber: 'AC101',
-          route: 'BEG → CDG',
-          date: '2025-10-15',
-          class: 'Economy',
-          status: 'Confirmed',
-          passengerName: 'Sample Passenger',
-          totalAmount: '€142.00'
-        }
-      ]);
+      setTickets([]);
     } finally {
       setLoading(false);
     }
   };
 
+    
   const pageStyle = {
-    padding: '24px',
-    fontFamily: 'Inter, sans-serif'
+    padding: '32px 32px 32px 32px',
+    fontFamily: 'Inter, sans-serif',
+    maxWidth: '100%',
+    margin: '0',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start'
   };
 
   const headerStyle = {
-    fontSize: '24px',
+    fontSize: '32px',
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: '24px'
+    marginBottom: '32px',
+    textAlign: 'left',
+    width: '100%',
+    marginLeft: '0'
   };
 
   const tableContainerStyle = {
     backgroundColor: 'white',
     border: '1px solid #e5e7eb',
     borderRadius: '8px',
-    overflow: 'hidden'
+    overflow: 'visible',
+    width: '100%',             // Full width to accommodate larger table
+    minWidth: '1630px',        // Increased min-width for wider table
+    marginLeft: '0',
+    marginRight: 'auto'        // This pushes it to the left
   };
-
   const tableHeaderStyle = {
     display: 'grid',
-    gridTemplateColumns: '120px 180px 120px 100px 140px 100px 100px 160px',
-    gap: '12px',
-    padding: '16px 20px',
+    gridTemplateColumns: '160px 260px 150px 130px 180px 140px 140px 260px',
+    gap: '20px',
+    padding: '20px 24px',
     backgroundColor: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb'
+    borderBottom: '1px solid #e5e7eb',
+    width: '100%',
+    minWidth: '1630px'
   };
 
   const headerCellStyle = {
-    fontSize: '14px',
-    fontWeight: '500',
+    fontSize: '16px',
+    fontWeight: '600',
     color: '#6b7280',
     textAlign: 'left'
   };
 
   const tableRowStyle = {
     display: 'grid',
-    gridTemplateColumns: '120px 180px 120px 100px 140px 100px 100px 160px',
-    gap: '12px',
-    padding: '16px 20px',
+    gridTemplateColumns: '160px 260px 150px 130px 180px 140px 140px 260px',
+    gap: '20px',
+    padding: '20px 24px',
     borderBottom: '1px solid #f3f4f6',
-    alignItems: 'center'
+    alignItems: 'center',
+    width: '100%',
+    minWidth: '1630px'
   };
 
   const cellStyle = {
-    fontSize: '14px',
+    fontSize: '16px',
     color: '#374151'
   };
 
@@ -193,6 +183,7 @@ export default function MyTickets() {
   };
 
   const getActionButtons = (ticket) => {
+    
     const buttonBaseStyle = {
       padding: '4px 8px',
       borderRadius: '4px',
@@ -208,13 +199,25 @@ export default function MyTickets() {
     const downloadButtonStyle = {
       ...buttonBaseStyle,
       backgroundColor: '#2563eb',
-      color: 'white'
+      color: 'white',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100px',
+      height: '32px',
+      fontSize: '12px'
     };
 
     const boardingButtonStyle = {
       ...buttonBaseStyle,
       backgroundColor: '#10b981',
-      color: 'white'
+      color: 'white',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100px',
+      height: '32px',
+      fontSize: '12px'
     };
 
     const cancelButtonStyle = {
@@ -225,7 +228,7 @@ export default function MyTickets() {
 
     if (ticket.status === 'Confirmed') {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', width: '100%', alignItems: 'center' }}>
           <button 
             style={downloadButtonStyle}
             onClick={() => handleDownloadTicket(ticket)}
@@ -264,18 +267,15 @@ export default function MyTickets() {
   };
 
   const handleEdit = (ticketId) => {
-    console.log('Edit ticket:', ticketId);
     toast.info('Editing functionality coming soon!');
   };
 
   const handleCancel = (ticketId) => {
-    console.log('Cancel ticket:', ticketId);
     toast.info('Cancellation functionality coming soon!');
   };
 
   const handleDownloadTicket = (ticket) => {
     try {
-      console.log('Download ticket:', ticket.id);
       
       // Convert ticket data to the format expected by PDF generator
       const ticketData = {
@@ -312,7 +312,6 @@ export default function MyTickets() {
 
   const handleDownloadBoardingPass = (ticket) => {
     try {
-      console.log('Download boarding pass:', ticket.id);
       
       // Convert ticket data to the format expected by PDF generator
       const ticketData = {
@@ -341,7 +340,6 @@ export default function MyTickets() {
   };
 
   const handleDownload = (ticketId) => {
-    console.log('Download ticket:', ticketId);
     toast.info('Legacy download function - use new PDF buttons!');
   };
 
@@ -355,7 +353,7 @@ export default function MyTickets() {
   return (
     <Layout>
       <div style={pageStyle}>
-        <h1 style={headerStyle}>My Tickets</h1>
+        <h1 style={headerStyle}>My Tickets 🎫</h1>
         
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>
@@ -397,20 +395,66 @@ export default function MyTickets() {
                 <div style={cellStyle}>
                   {ticket.totalAmount || 'N/A'}
                 </div>
-                <div>
+                <div style={cellStyle}>
                   <span style={getStatusBadge(ticket.status)}>
                     {ticket.status}
                   </span>
                 </div>
-                <div>
-                  {getActionButtons(ticket)}
+                <div style={{
+                  ...cellStyle, 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '6px',
+                  minWidth: '180px',
+                  alignItems: 'stretch'
+                }}>
+                  <button 
+                    style={{
+                      backgroundColor: '#2563eb', 
+                      color: 'white', 
+                      padding: '8px 12px', 
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontFamily: 'Inter, sans-serif'
+                    }}
+                    onClick={() => handleDownloadTicket(ticket)}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
+                    title="Download PDF Ticket"
+                  >
+                    📄 E-ticket
+                  </button>
+                  <button 
+                    style={{
+                      backgroundColor: '#10b981', 
+                      color: 'white', 
+                      padding: '8px 12px', 
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontFamily: 'Inter, sans-serif'
+                    }}
+                    onClick={() => handleDownloadBoardingPass(ticket)}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                    title="Download Boarding Pass"
+                  >
+                    🎫 Boarding Pass
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div style={emptyStateStyle}>
-            <p>No tickets found. Book your first flight to see tickets here.</p>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>✈️</div>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>No Tickets Found</h3>
+            <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>You haven't booked any flights yet. Start by searching for flights to book your first trip!</p>
           </div>
         )}
       </div>

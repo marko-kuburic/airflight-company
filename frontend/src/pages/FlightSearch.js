@@ -29,35 +29,68 @@ export default function FlightSearch() {
   };
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: "#EEF4FB" }}>
+    <div style={{ backgroundColor: "#EEF4FB", minHeight: "100vh", position: "relative" }}>
       {/* Sidebar */}
       <Sidebar />
       
-      {/* Main content */}
-      <div className="flex-1 ml-0 lg:ml-64">
-        <div className="container mx-auto px-4 py-8">
-          <h1 
-            className="text-2xl font-bold mb-6 text-center"
-            style={{
-              fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
-              color: "#2F3E4D"
-            }}
-          >
-            Search Flights
-          </h1>
-          
-          {/* SearchBar komponenta */}
-          <div className="max-w-4xl mx-auto">
-            <SearchBar onSearchResults={handleSearchResults} />
-          </div>
-          
-          {/* Flight search results */}
-          <div className="max-w-4xl mx-auto">
+      {/* Main content - absolute positioning to avoid sidebar issues */}
+      <div style={{
+        position: 'absolute',
+        top: '0px',
+        left: '280px',
+        right: '0px',
+        padding: '20px'
+      }}>
+        <h1 
+          style={{
+            fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
+            color: "#2F3E4D",
+            fontSize: "28px",
+            fontWeight: "bold",
+            marginBottom: "15px",
+            marginTop: "0px",
+            paddingTop: "30px",
+            textAlign: "center"
+          }}
+        >
+          Search Flights
+        </h1>
+        
+        {/* SearchBar komponenta - made bigger */}
+        <div style={{
+          width: '100%',
+          maxWidth: '1200px',
+          margin: '0 auto',
+          marginBottom: '20px'
+        }}>
+          <SearchBar onSearchResults={handleSearchResults} />
+        </div>
+        
+        {/* Flight search results */}
+        <div style={{
+          width: '100%',
+          maxWidth: '1200px',
+          margin: '0 auto'
+        }}>
           {isSearched ? (
             searchResults.length > 0 ? (
-              <div className="bg-white rounded-xl" style={{ border: "1px solid #D9E1EA" }}>
-                <div className="p-4 border-b" style={{ borderColor: "#D9E1EA" }}>
-                  <h2 className="text-lg font-semibold" style={{ fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif", color: "#2F3E4D" }}>
+              <div style={{ 
+                backgroundColor: 'white', 
+                borderRadius: '12px',
+                border: "1px solid #D9E1EA",
+                overflow: 'hidden'
+              }}>
+                <div style={{ 
+                  padding: '20px', 
+                  borderBottom: "1px solid #D9E1EA" 
+                }}>
+                  <h2 style={{ 
+                    fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif", 
+                    color: "#2F3E4D",
+                    fontSize: "18px",
+                    fontWeight: "600",
+                    margin: 0
+                  }}>
                     Available Flights ({searchResults.length})
                   </h2>
                 </div>
@@ -73,38 +106,41 @@ export default function FlightSearch() {
                 </div>
               </div>
             ) : (
-              <div 
-                className="bg-white rounded-xl p-6 text-center"
-                style={{ border: "1px solid #D9E1EA" }}
-              >
-                <p 
-                  style={{
-                    fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
-                    color: "#738396",
-                    fontSize: "14px"
-                  }}
-                >
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                padding: '40px',
+                textAlign: 'center',
+                border: "1px solid #D9E1EA"
+              }}>
+                <p style={{
+                  fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
+                  color: "#738396",
+                  fontSize: "16px",
+                  margin: 0
+                }}>
                   No flights found for your search criteria.
                 </p>
               </div>
             )
           ) : (
-            <div 
-              className="bg-white rounded-xl p-6 text-center"
-              style={{ border: "1px solid #D9E1EA" }}
-            >
-              <p 
-                style={{
-                  fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
-                  color: "#738396",
-                  fontSize: "14px"
-                }}
-              >
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '40px',
+              textAlign: 'center',
+              border: "1px solid #D9E1EA"
+            }}>
+              <p style={{
+                fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
+                color: "#738396",
+                fontSize: "16px",
+                margin: 0
+              }}>
                 Search results will appear here...
               </p>
             </div>
           )}
-        </div>
         </div>
       </div>
     </div>
