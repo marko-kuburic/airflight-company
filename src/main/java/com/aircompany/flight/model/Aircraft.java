@@ -41,7 +41,7 @@ public class Aircraft {
     private LocalDateTime modifiedAt;
     
     @OneToOne(mappedBy = "aircraft", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Service service;
+    private Maintenance service;
     
     @OneToMany(mappedBy = "aircraft", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Flight> flights = new ArrayList<>();
@@ -104,11 +104,11 @@ public class Aircraft {
         this.modifiedAt = modifiedAt;
     }
     
-    public Service getService() {
+    public Maintenance getService() {
         return service;
     }
     
-    public void setService(Service service) {
+    public void setService(Maintenance service) {
         this.service = service;
     }
     

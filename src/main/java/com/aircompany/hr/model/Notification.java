@@ -20,8 +20,12 @@ public class Notification {
     private Long id;
     
     @NotBlank
-    @Column(name = "message", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "message", nullable = false)
     private String message;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type")
+    private NotificationType type;
     
     @NotNull
     @Column(name = "timestamp", nullable = false)
@@ -31,12 +35,8 @@ public class Notification {
     private Boolean isRead = false;
     
     @Enumerated(EnumType.STRING)
-    @Column(name = "type")
-    private NotificationType type;
-    
-    @Enumerated(EnumType.STRING)
     @Column(name = "resp_status")
-    private ResponseStatus respStatus;
+    private ResponseStatus respStatus = ResponseStatus.PENDING;
     
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -80,6 +80,14 @@ public class Notification {
         this.message = message;
     }
     
+    public NotificationType getType() {
+        return type;
+    }
+    
+    public void setType(NotificationType type) {
+        this.type = type;
+    }
+    
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
@@ -94,14 +102,6 @@ public class Notification {
     
     public void setIsRead(Boolean isRead) {
         this.isRead = isRead;
-    }
-    
-    public NotificationType getType() {
-        return type;
-    }
-    
-    public void setType(NotificationType type) {
-        this.type = type;
     }
     
     public ResponseStatus getRespStatus() {
@@ -136,7 +136,6 @@ public class Notification {
         this.user = user;
     }
     
-    // Nested Enums
     public enum NotificationType {
         FLIGHT_UPDATE,
         SCHEDULE_CHANGE,
