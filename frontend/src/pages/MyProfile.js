@@ -31,8 +31,8 @@ export default function MyProfile() {
 
       // Get fresh profile data from backend
       try {
-        console.log('Calling getUserProfile for userId:', userData.id);
-        const profileResponse = await authAPI.getUserProfile(userData.id);
+        console.log('Calling getCustomerProfile for customerId:', userData.id);
+        const profileResponse = await authAPI.getCustomerProfile(userData.id);
         console.log('Profile API response:', JSON.stringify(profileResponse.data, null, 2));
         setProfileData(profileResponse.data);
       } catch (error) {
@@ -57,7 +57,7 @@ export default function MyProfile() {
 
       // Load payment methods from backend
       try {
-        const paymentResponse = await authAPI.getUserPaymentMethods(userData.id);
+        const paymentResponse = await authAPI.getCustomerPaymentMethods(userData.id);
         setPaymentMethods(paymentResponse.data || []);
       } catch (error) {
         setPaymentMethods([]);
@@ -65,7 +65,7 @@ export default function MyProfile() {
 
       // Load recent purchases from backend
       try {
-        const reservationsResponse = await authAPI.getUserReservations(userData.id);
+        const reservationsResponse = await authAPI.getCustomerReservations(userData.id);
         const reservations = reservationsResponse.data?.reservations || [];
         
         const purchases = reservations.map(reservation => ({
@@ -103,7 +103,7 @@ export default function MyProfile() {
       }
 
       console.log('Making API call to update profile...');
-      const response = await authAPI.updateUserProfile(userData.id, updatedData);
+      const response = await authAPI.updateCustomerProfile(userData.id, updatedData);
       console.log('API response received:', response);
       console.log('API response data:', JSON.stringify(response.data, null, 2));
       
@@ -169,7 +169,7 @@ export default function MyProfile() {
     try {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       if (userData.id) {
-        const response = await authAPI.getUserPaymentMethods(userData.id);
+        const response = await authAPI.getCustomerPaymentMethods(userData.id);
         setPaymentMethods(response.data || []);
       }
     } catch (error) {

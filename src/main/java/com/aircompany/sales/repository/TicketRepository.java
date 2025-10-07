@@ -69,4 +69,20 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
      */
     @Query("SELECT t FROM Ticket t WHERE t.reservation.customer.id = :customerId ORDER BY t.createdAt DESC")
     List<Ticket> findByCustomerId(@Param("customerId") Long customerId);
+    
+    /**
+     * Find tickets for a customer with all related data eagerly loaded
+     */
+    @Query("SELECT DISTINCT t FROM Ticket t " +
+           "JOIN FETCH t.reservation r " +
+           "JOIN FETCH r.offer o " +
+           "JOIN FETCH o.flight f " +
+           "LEFT JOIN FETCH f.route " +
+           "LEFT JOIN FETCH o.fares fare " +
+           "LEFT JOIN FETCH fare.cabinClass " +
+           "LEFT JOIN FETCH r.payment " +
+           "JOIN FETCH t.passenger " +
+           "WHERE r.customer.id = :customerId " +
+           "ORDER BY t.createdAt DESC")
+    List<Ticket> findByReservation_Customer_Id(@Param("customerId") Long customerId);
 }

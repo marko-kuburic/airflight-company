@@ -25,7 +25,7 @@ export default function LoyaltyProgram() {
         const userId = user.id;
         
         // Fetch loyalty data from API
-        const response = await authAPI.getUserLoyalty(userId);
+        const response = await authAPI.getCustomerLoyalty(userId);
         setLoyaltyData(response.data);
       } catch (error) {
         console.error('Error fetching loyalty data:', error);

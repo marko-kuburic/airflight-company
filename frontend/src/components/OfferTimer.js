@@ -14,9 +14,10 @@ export const OfferTimer = ({ flight, onOfferRefresh }) => {
         if (!offer?.expiresAt) return;
 
         const updateTimer = () => {
-            const now = new Date().getTime();
-            const expireTime = new Date(offer.expiresAt).getTime();
-            const difference = expireTime - now;
+            const now = new Date();
+            // Parse the expiresAt string and treat it as UTC
+            const expireTime = new Date(offer.expiresAt + 'Z'); // Add 'Z' to treat as UTC
+            const difference = expireTime.getTime() - now.getTime();
 
             if (difference > 0) {
                 const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));

@@ -1,29 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { FlightSummaryCard } from '../components/FlightSummaryCard';
 import { PaymentMethodSelector } from '../components/PaymentMethodSelector';
-import { bookingAPI } from '../services/api';
+import { bookingAPI, authAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 export default function Payment() {
   const [paymentData, setPaymentData] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const [savedPaymentMethods, setSavedPaymentMethods] = useState([]);
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   
   // Get booking data from route state
   const bookingState = location.state || {};
   const { selectedFlight, passengerData, selectedSeat, seatPrice = 0, totalPrice } = bookingState;
+
+  const basePrice = parseFloat(selectedFlight?.currentPrice || selectedFlight?.price || '0');
+  const calculatedTotal = totalPrice || (basePrice + seatPrice);
+
+  // Fetch loyalty balance and saved payment methods
+  useEffect(() => {
+    const fetchPaymentData = async () => {
+      try {
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        if (userData.id) {
+          // Fetch loyalty balance
+          try {
+            const loyaltyResponse = await authAPI.getCustomerLoyalty(userData.id);
+            setLoyaltyBalance(loyaltyResponse.data.points || 0);
+          } catch (error) {
+            console.warn('Could not fetch loyalty balance:', error);
+            setLoyaltyBalance(0);
+          }
+
+          // Fetch saved payment methods
+          try {
+            const paymentMethodsResponse = await authAPI.getSavedPaymentMethods(userData.id);
+            setSavedPaymentMethods(paymentMethodsResponse.data || []);
+          } catch (error) {
+            console.warn('Could not fetch saved payment methods:', error);
+            setSavedPaymentMethods([]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching payment data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPaymentData();
+  }, []);
   
-  // Redirect back if no booking data
+  // Redirect back if no booking data - AFTER all hooks
   if (!selectedFlight || !passengerData) {
     navigate('/search');
     return null;
   }
-
-  const basePrice = parseFloat(selectedFlight.currentPrice || selectedFlight.price || '0');
-  const calculatedTotal = totalPrice || (basePrice + seatPrice);
 
   const handlePaymentChange = (data) => {
     setPaymentData(data);
@@ -75,22 +112,42 @@ export default function Payment() {
     setProcessing(true);
 
     try {
+      // Get logged-in user ID from localStorage
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!userData.id) {
+        toast.error('Please log in to complete booking');
+        navigate('/login');
+        return;
+      }
+
       // First create the reservation
+      const offerId = selectedFlight.offers && selectedFlight.offers.length > 0 ? selectedFlight.offers[0].id : null;
+      if (!offerId) {
+        console.error('No offers found for selectedFlight:', selectedFlight);
+        toast.error('No offers available for this flight. Please try searching for flights again.');
+        return;
+      }
+      
       const reservationData = {
-        flightId: selectedFlight.flightId || selectedFlight.id,
-        passengers: [{
-          firstName: passengerData.firstName,
-          lastName: passengerData.lastName,
-          dateOfBirth: passengerData.dateOfBirth,
-          documentNumber: passengerData.documentNumber,
-          phone: passengerData.phone,
-          email: passengerData.email
+        customerId: userData.id,
+        offerId: offerId,
+        tickets: [{
+          passenger: {
+            firstName: passengerData.firstName,
+            lastName: passengerData.lastName,
+            dateOfBirth: new Date(passengerData.dateOfBirth).toISOString().split('T')[0], // Convert to YYYY-MM-DD format
+            documentNumber: passengerData.documentNumber,
+            phone: passengerData.phone,
+            email: passengerData.email
+          },
+          seatNumber: selectedSeat || null
         }],
-        seatSelection: selectedSeat ? {
-          seatNumber: selectedSeat,
-          price: seatPrice
-        } : null
+        specialRequests: null
       };
+
+      console.log('Selected flight data:', selectedFlight);
+      console.log('Using offerId:', offerId);
+      console.log('Sending reservation data:', reservationData);
 
       console.log('Creating reservation:', reservationData);
       
@@ -116,7 +173,9 @@ export default function Payment() {
       const paymentDataForBackend = {
         reservationId: reservationResponse.data.id,
         totalAmount: calculatedTotal,
-        paymentMethod: paymentData.method.toUpperCase(), // CARD, LOYALTY, COMBINED
+        paymentMethod: paymentData.method === 'card' ? 'CREDIT_CARD' : 
+                      paymentData.method === 'loyalty' ? 'LOYALTY_POINTS' : 
+                      paymentData.method === 'combined' ? 'COMBINED' : 'CREDIT_CARD', // Map frontend values to backend enum
         loyaltyPointsToUse: paymentData.method === 'loyalty' || paymentData.method === 'combined' 
           ? parseInt(paymentData.loyaltyPoints || '0') : 0,
         cashAmount: calculatedTotal,
@@ -375,16 +434,29 @@ export default function Payment() {
             <span>Taxes & Fees</span>
             <span>€0.00</span>
           </div>
+          {paymentData?.loyaltyDiscount > 0 && (
+            <div style={{...priceRowStyle, color: '#10b981'}}>
+              <span>💎 Loyalty Discount ({parseInt(paymentData.loyaltyPoints || 0)} points)</span>
+              <span>-€{paymentData.loyaltyDiscount.toFixed(2)}</span>
+            </div>
+          )}
           <div style={totalRowStyle}>
-            <span>Total</span>
-            <span>€{calculatedTotal.toFixed(2)}</span>
+            <span>Total to Pay</span>
+            <span>€{(calculatedTotal - (paymentData?.loyaltyDiscount || 0)).toFixed(2)}</span>
           </div>
+          {loyaltyBalance > 0 && (
+            <div style={{...priceRowStyle, fontSize: '12px', color: '#6b7280', marginTop: '8px'}}>
+              <span>💎 Available loyalty points: {loyaltyBalance.toLocaleString()} (€{(loyaltyBalance / 100).toFixed(2)})</span>
+            </div>
+          )}
         </div>
         
         {/* Payment Method */}
         <PaymentMethodSelector 
           onPaymentChange={handlePaymentChange}
           totalAmount={calculatedTotal}
+          loyaltyBalance={loyaltyBalance}
+          savedPaymentMethods={savedPaymentMethods}
         />
 
         <div style={buttonContainerStyle}>
@@ -408,7 +480,7 @@ export default function Payment() {
             onMouseEnter={(e) => !processing && (e.target.style.backgroundColor = '#059669')}
             onMouseLeave={(e) => !processing && (e.target.style.backgroundColor = '#10b981')}
           >
-            {processing ? 'Processing...' : `Pay €${calculatedTotal.toFixed(2)}`}
+            {processing ? 'Processing...' : `Pay €${(calculatedTotal - (paymentData?.loyaltyDiscount || 0)).toFixed(2)}`}
           </button>
         </div>
       </div>

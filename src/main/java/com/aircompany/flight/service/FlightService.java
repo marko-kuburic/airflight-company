@@ -1,13 +1,12 @@
-package com.aircompany.sales.service;
+package com.aircompany.flight.service;
 
 import com.aircompany.flight.model.Flight;
-import com.aircompany.flight.model.Airport;
 import com.aircompany.flight.model.Aircraft;
 import com.aircompany.sales.dto.FlightSearchRequest;
 import com.aircompany.sales.dto.FlightSearchResponse;
 import com.aircompany.sales.model.Offer;
-import com.aircompany.sales.model.Ticket;
-import com.aircompany.sales.repository.TicketRepository;
+import com.aircompany.sales.service.OfferService;
+import com.aircompany.sales.service.DynamicPricingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,9 +33,6 @@ public class FlightService {
     private EntityManager entityManager;
     
     @Autowired
-    private TicketRepository ticketRepository;
-    
-    @Autowired
     private OfferService offerService;
     
     @Autowired
@@ -46,6 +42,7 @@ public class FlightService {
      * Search for flights based on search criteria
      * Supports "Anywhere" searches where origin and/or destination can be empty
      */
+    @Transactional
     public List<FlightSearchResponse> searchFlights(FlightSearchRequest searchRequest) {
         logger.info("Searching flights from '{}' to '{}' on {}", 
             searchRequest.getOrigin(), searchRequest.getDestination(), searchRequest.getDepartureDate());
@@ -162,34 +159,6 @@ public class FlightService {
     }
     
     /**
-     * Get occupied seats for a flight
-     */
-    public List<String> getOccupiedSeats(Long flightId) {
-        TypedQuery<String> query = entityManager.createQuery(
-            "SELECT t.seatNumber FROM Ticket t " +
-            "JOIN t.reservation r " +
-            "JOIN r.offer o " +
-            "JOIN o.flight f " +
-            "WHERE f.id = :flightId " +
-            "AND t.seatNumber IS NOT NULL " +
-            "AND t.status IN ('CONFIRMED', 'USED') " +
-            "AND r.status != 'CANCELLED'",
-            String.class
-        );
-        query.setParameter("flightId", flightId);
-        
-        return query.getResultList();
-    }
-    
-    /**
-     * Check if a seat is available
-     */
-    public boolean isSeatAvailable(Long flightId, String seatNumber) {
-        List<String> occupiedSeats = getOccupiedSeats(flightId);
-        return !occupiedSeats.contains(seatNumber);
-    }
-    
-    /**
      * Get seat map configuration for a flight
      */
     public Map<String, Object> getSeatMap(Long flightId) {
@@ -199,22 +168,16 @@ public class FlightService {
         }
         
         Aircraft aircraft = flight.getAircraft();
-        List<String> occupiedSeats = getOccupiedSeats(flightId);
         
         // Generate seat map based on aircraft capacity
         Map<String, Object> seatMap = new HashMap<>();
         seatMap.put("aircraftModel", aircraft.getModel());
         seatMap.put("totalCapacity", aircraft.getCapacity());
-        seatMap.put("occupiedSeats", occupiedSeats);
-        seatMap.put("availableSeats", aircraft.getCapacity() - occupiedSeats.size());
         
         // Generate available seat numbers (simplified)
         List<String> allSeats = generateSeatNumbers(aircraft.getCapacity());
-        List<String> availableSeats = allSeats.stream()
-            .filter(seat -> !occupiedSeats.contains(seat))
-            .collect(Collectors.toList());
         
-        seatMap.put("availableSeatNumbers", availableSeats);
+        seatMap.put("availableSeatNumbers", allSeats);
         seatMap.put("seatConfiguration", generateSeatConfiguration(aircraft.getCapacity()));
         
         return seatMap;
@@ -224,7 +187,15 @@ public class FlightService {
      * Convert Flight entity to FlightSearchResponse DTO
      */
     private FlightSearchResponse convertToFlightResponse(Flight flight) {
+        // Get active AND NON-EXPIRED offers for this flight
         List<Offer> offers = offerService.getActiveOffersForFlight(flight.getId());
+        
+        // If no active offers exist or all are expired, regenerate
+        if (offers.isEmpty()) {
+            logger.info("No active offers found for flight {}. Regenerating offer.", flight.getFlightNumber());
+            Offer newOffer = offerService.regenerateOfferForFlight(flight.getId());
+            offers = List.of(newOffer);
+        }
         
         FlightSearchResponse response = new FlightSearchResponse(flight, offers);
         
@@ -238,9 +209,8 @@ public class FlightService {
         response.setBasePrice(dynamicPricingService.getBasePrice(flight, offers));
         response.setCurrentPrice(dynamicPricingService.getCurrentPrice(flight, offers));
         
-        // Get available seats
-        List<String> occupiedSeats = getOccupiedSeats(flight.getId());
-        response.setAvailableSeats(flight.getAircraft().getCapacity() - occupiedSeats.size());
+        // Set available seats (simplified - using total capacity)
+        response.setAvailableSeats(flight.getAircraft().getCapacity());
         
         // Set offers information
         if (!offers.isEmpty()) {

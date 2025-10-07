@@ -1,9 +1,9 @@
-package com.aircompany.sales.controller;
+package com.aircompany.flight.controller;
 
 import com.aircompany.flight.model.Flight;
+import com.aircompany.flight.service.FlightService;
 import com.aircompany.sales.dto.FlightSearchRequest;
 import com.aircompany.sales.dto.FlightSearchResponse;
-import com.aircompany.sales.service.FlightService;
 import com.aircompany.sales.service.OfferService;
 import com.aircompany.sales.model.Offer;
 import jakarta.validation.Valid;
@@ -84,40 +84,6 @@ public class FlightController {
         } catch (Exception e) {
             logger.error("Error getting offers for flight: {}", e.getMessage());
             return ResponseEntity.badRequest().body(createErrorResponse("Error getting offers: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Get occupied seats for a flight
-     */
-    @GetMapping("/{flightId}/occupied-seats")
-    public ResponseEntity<?> getOccupiedSeats(@PathVariable Long flightId) {
-        try {
-            List<String> occupiedSeats = flightService.getOccupiedSeats(flightId);
-            return ResponseEntity.ok(occupiedSeats);
-        } catch (Exception e) {
-            logger.error("Error getting occupied seats: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(createErrorResponse("Error getting occupied seats: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Check seat availability
-     */
-    @GetMapping("/{flightId}/seats/{seatNumber}/availability")
-    public ResponseEntity<?> checkSeatAvailability(@PathVariable Long flightId, 
-                                                  @PathVariable String seatNumber) {
-        try {
-            boolean isAvailable = flightService.isSeatAvailable(flightId, seatNumber);
-            Map<String, Object> response = new HashMap<>();
-            response.put("available", isAvailable);
-            response.put("seatNumber", seatNumber);
-            response.put("flightId", flightId);
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            logger.error("Error checking seat availability: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(createErrorResponse("Error checking seat availability: " + e.getMessage()));
         }
     }
     

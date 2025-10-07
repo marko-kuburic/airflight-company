@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -60,25 +60,35 @@ api.interceptors.response.use(
 
 // API endpoints
 export const authAPI = {
-  // Authentication
+  // Authentication - HR domain
   login: (credentials) => api.post('/users/login', credentials),
   register: (userData) => api.post('/users/register', userData),
+  logout: () => api.post('/users/logout'),
+  changePassword: (userId, passwordData) => api.post(`/users/${userId}/change-password`, passwordData),
   
-  // User management
-  getUserProfile: (userId) => api.get(`/users/profile/${userId}`),
-  updateUserProfile: (userId, data) => api.put(`/users/profile/${userId}`, data),
-  getUserReservations: (userId) => api.get(`/users/${userId}/reservations`),
-  getUserLoyalty: (userId) => api.get(`/users/${userId}/loyalty`),
+  // Customer management - Sales domain
+  getCustomerProfile: (customerId) => api.get(`/customers/profile/${customerId}`),
+  updateCustomerProfile: (customerId, data) => api.put(`/customers/profile/${customerId}`, data),
+  getCustomerReservations: (customerId) => api.get(`/customers/${customerId}/reservations`),
+  getCustomerLoyalty: (customerId) => api.get(`/customers/${customerId}/loyalty`),
   
   // Notifications
-  getUserNotifications: (userId) => api.get(`/users/${userId}/notifications`),
-  markNotificationAsRead: (userId, notificationId) => api.put(`/users/${userId}/notifications/${notificationId}/read`),
-  markAllNotificationsAsRead: (userId) => api.put(`/users/${userId}/notifications/read-all`),
+  getCustomerNotifications: (customerId) => api.get(`/customers/${customerId}/notifications`),
+  markNotificationAsRead: (customerId, notificationId) => api.put(`/customers/${customerId}/notifications/${notificationId}/read`),
+  markAllNotificationsAsRead: (customerId) => api.put(`/customers/${customerId}/notifications/read-all`),
   
   // Payment methods
-  getUserPaymentMethods: (userId) => api.get(`/users/${userId}/payment-methods`),
-  savePaymentMethod: (userId, data) => api.post(`/users/${userId}/payment-methods`, data),
-  deletePaymentMethod: (userId, paymentMethodId) => api.delete(`/users/${userId}/payment-methods/${paymentMethodId}`),
+  getCustomerPaymentMethods: (customerId) => api.get(`/customers/${customerId}/payment-methods`),
+  savePaymentMethod: (customerId, data) => api.post(`/customers/${customerId}/payment-methods`, data),
+  deletePaymentMethod: (customerId, paymentMethodId) => api.delete(`/customers/${customerId}/payment-methods/${paymentMethodId}`),
+  
+  // Legacy aliases for backward compatibility (temporary)
+  getUserProfile: (userId) => api.get(`/customers/profile/${userId}`),
+  updateUserProfile: (userId, data) => api.put(`/customers/profile/${userId}`, data),
+  getUserReservations: (userId) => api.get(`/customers/${userId}/reservations`),
+  getUserLoyalty: (userId) => api.get(`/customers/${userId}/loyalty`),
+  getUserNotifications: (userId) => api.get(`/customers/${userId}/notifications`),
+  getUserPaymentMethods: (userId) => api.get(`/customers/${userId}/payment-methods`),
 };
 
 export const flightAPI = {
@@ -113,7 +123,9 @@ export const bookingAPI = {
   getReservationByNumber: (reservationNumber) => 
     api.get(`/bookings/reservations/number/${reservationNumber}`),
   getReservationsByCustomer: (customerId) => 
-    api.get(`/test/reservations/${customerId}`),
+    api.get(`/bookings/reservations/customer/${customerId}`),
+  getTicketsByCustomer: (customerId) => 
+    api.get(`/tickets/customer/${customerId}`),
   cancelReservation: (id, reason) => 
     api.post(`/bookings/reservations/${id}/cancel`, null, { params: { reason } }),
   

@@ -25,7 +25,7 @@ export default function Notifications() {
         const user = JSON.parse(userData);
         const userId = user.id;
 
-        const response = await authAPI.getUserNotifications(userId);
+        const response = await authAPI.getCustomerNotifications(userId);
         const data = response.data;
         
         // Transform backend notifications to frontend format

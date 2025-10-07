@@ -34,7 +34,7 @@ export function PointsCard({ points }) {
       <div style={titleStyle}>Points / Miles</div>
       <div style={pointsStyle}>{points?.toLocaleString() || '18,450'}</div>
       <div style={descriptionStyle}>
-        Points are credited after completed flights.
+        Points are credited each time you reserve a flights, fly and also when you become eligible for a special bonus.
       </div>
     </div>
   );

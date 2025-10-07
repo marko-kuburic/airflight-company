@@ -18,48 +18,66 @@ export default function MyTickets() {
     try {
       let allTickets = [];
       
-      // Load from localStorage first (for completed bookings in this session)
-      const savedBookings = JSON.parse(localStorage.getItem('myBookings') || '[]');
-      const localTickets = savedBookings.map(booking => ({
-        id: booking.ticketNumber || `TCK-${booking.reservationId || Date.now()}`,
-        flightNumber: booking.flightDetails?.flightNumber || 'N/A',
-        route: booking.flightDetails?.route || 'N/A',
-        date: booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        class: booking.flightDetails?.class || 'Economy',
-        status: 'Confirmed',
-        passengerName: booking.passengerName,
-        totalAmount: booking.paymentAmount,
-        seat: booking.selectedSeat,
-        email: booking.email
-      }));
-      allTickets = [...localTickets];
-      
-      // Try to load from backend
+      // Try to load from backend FIRST (prioritize real data)
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       if (userData.id) {
         try {
-          const response = await bookingAPI.getReservationsByCustomer(userData.id);
-          // Transform reservations to ticket format
-          const backendTickets = response.data.map(reservation => ({
-            id: reservation.reservationNumber || `TCK-${reservation.id}`,
-            flightNumber: reservation.flightNumber || 'N/A',
-            route: reservation.route || 'N/A',
-            date: reservation.date || new Date().toISOString().split('T')[0],
-            class: 'Economy',
-            status: reservation.status || 'Confirmed',
-            passengerName: reservation.passengerName,
-            totalAmount: reservation.totalAmount,
-            seat: reservation.seatNumber,
-            email: reservation.email
+          const response = await bookingAPI.getTicketsByCustomer(userData.id);
+          console.log('Backend tickets response:', response.data);
+          
+          // Transform tickets to display format
+          const backendTickets = response.data.map(ticket => ({
+            id: ticket.id,
+            reservationNumber: ticket.reservation?.reservationNumber || 'N/A',
+            flightNumber: ticket.flight?.flightNumber || 'N/A',
+            route: ticket.flight?.route || 'N/A',
+            date: ticket.flight?.departureTime ? 
+              new Date(ticket.flight.departureTime).toISOString().split('T')[0] : 
+              new Date().toISOString().split('T')[0],
+            class: ticket.cabinClass || 'Economy',
+            status: ticket.status || 'Confirmed',
+            passengerName: ticket.passenger ? `${ticket.passenger.firstName || ''} ${ticket.passenger.lastName || ''}`.trim() : 'N/A',
+            totalAmount: ticket.reservation?.payment?.amount || ticket.totalAmount || ticket.price || 'N/A',
+            seat: ticket.seatNumber || 'N/A',
+            email: ticket.passenger?.email || 'N/A'
           }));
           
-          // Merge backend tickets with local tickets (avoid duplicates)
-          const backendTicketIds = new Set(backendTickets.map(t => t.id));
-          const uniqueLocalTickets = allTickets.filter(t => !backendTicketIds.has(t.id));
-          allTickets = [...backendTickets, ...uniqueLocalTickets];
+          console.log('Mapped backend tickets:', backendTickets);
+          allTickets = [...backendTickets];
         } catch (backendError) {
           console.warn('Backend not available, using localStorage only:', backendError);
+          // Only fall back to localStorage if backend fails
+          const savedBookings = JSON.parse(localStorage.getItem('myBookings') || '[]');
+          const localTickets = savedBookings.map(booking => ({
+            id: booking.ticketNumber || `TCK-${booking.reservationId || Date.now()}`,
+            flightNumber: booking.flightDetails?.flightNumber || 'N/A',
+            route: booking.flightDetails?.route || 'N/A',
+            date: booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            class: booking.flightDetails?.class || 'Economy',
+            status: 'Confirmed',
+            passengerName: booking.passengerName,
+            totalAmount: booking.paymentAmount,
+            seat: booking.selectedSeat,
+            email: booking.email
+          }));
+          allTickets = [...localTickets];
         }
+      } else {
+        // No user logged in, show localStorage as fallback
+        const savedBookings = JSON.parse(localStorage.getItem('myBookings') || '[]');
+        const localTickets = savedBookings.map(booking => ({
+          id: `TCK-${booking.reservationId}`,
+          flightNumber: booking.flightDetails?.flightNumber || 'N/A',
+          route: booking.flightDetails?.route || 'N/A',
+          date: booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          class: booking.flightDetails?.class || 'Economy',
+          status: 'Confirmed',
+          passengerName: booking.passengerName,
+          totalAmount: booking.paymentAmount,
+          seat: booking.selectedSeat,
+          email: booking.email
+        }));
+        allTickets = [...localTickets];
       }
       
       setTickets(allTickets);
@@ -149,28 +167,28 @@ export default function MyTickets() {
     };
 
     switch (status) {
-      case 'Created':
+      case 'CREATED':
         return {
           ...baseStyle,
           backgroundColor: '#fef3c7',
           color: '#92400e',
           borderColor: '#f59e0b'
         };
-      case 'Confirmed':
+      case 'CONFIRMED':
         return {
           ...baseStyle,
           backgroundColor: '#d1fae5',
           color: '#065f46',
           borderColor: '#10b981'
         };
-      case 'Cancelled':
+      case 'CANCELLED':
         return {
           ...baseStyle,
           backgroundColor: '#fee2e2',
           color: '#991b1b',
           borderColor: '#ef4444'
         };
-      case 'Used':
+      case 'USED':
         return {
           ...baseStyle,
           backgroundColor: '#e0e7ff',
@@ -290,7 +308,7 @@ export default function MyTickets() {
         },
         passengerName: ticket.passengerName,
         bookingReference: `REF-${ticket.id}`,
-        paymentAmount: ticket.totalAmount,
+        paymentAmount: String(ticket.totalAmount || 0), // ✅ Convert to string
         email: ticket.email,
         selectedSeat: ticket.seat,
         paymentMethod: 'Card',
@@ -379,10 +397,9 @@ export default function MyTickets() {
                 ...tableRowStyle,
                 backgroundColor: index % 2 === 0 ? 'white' : '#fafafa'
               }}>
-                <div style={cellStyle}>{ticket.id}</div>
+                <div style={cellStyle}>{"TCK-" + ticket.id + "-LMN"}</div>
                 <div style={cellStyle}>
                   <div>{ticket.flightNumber}</div>
-                  <div style={{ fontSize: '12px', color: '#6b7280' }}>{ticket.route}</div>
                   {ticket.seat && (
                     <div style={{ fontSize: '12px', color: '#6b7280' }}>Seat: {ticket.seat}</div>
                   )}

@@ -62,42 +62,46 @@ export const FlightCard = ({ flight, onFlightSelect, onFlightUpdate }) => {
                     </div>
                 </div>
 
-                {/* Route and time info */}
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-6">
+                {/* Route and time info - Centered and Larger */}
+                <div className="flex flex-col items-center justify-center mb-6 py-4">
+                    <div className="flex items-center justify-center w-full max-w-4xl space-x-12">
                         {/* Departure */}
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-center flex-shrink-0">
+                            <div className="text-4xl font-bold text-gray-900 mb-2">
                                 {formatTime(currentFlight.departureTime)}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-base font-medium text-gray-600 mb-1">
                                 {currentFlight.origin}
                             </div>
-                            <div className="text-xs text-gray-400">
+                            <div className="text-sm text-gray-400">
                                 {formatDate(currentFlight.departureTime)}
                             </div>
                         </div>
 
                         {/* Flight path */}
-                        <div className="flex-1 flex items-center justify-center relative">
-                            <div className="absolute w-full h-px bg-gray-300"></div>
-                            <div className="bg-white px-3 py-1 border border-gray-300 rounded-full text-xs text-gray-500">
-                                {currentFlight.duration}
+                        <div className="flex-1 flex flex-col items-center justify-center relative px-8">
+                            <div className="w-full relative">
+                                <div className="absolute w-full h-0.5 bg-gradient-to-r from-blue-400 to-blue-600 top-1/2 transform -translate-y-1/2"></div>
+                                <div className="relative flex justify-center">
+                                    <div className="bg-white px-4 py-2 border-2 border-blue-500 rounded-full text-sm font-medium text-blue-600 shadow-sm">
+                                        ✈️ {currentFlight.duration}
+                                    </div>
+                                </div>
                             </div>
-                            <svg className="absolute right-0 w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className="absolute right-4 w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
                         </div>
 
                         {/* Arrival */}
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-center flex-shrink-0">
+                            <div className="text-4xl font-bold text-gray-900 mb-2">
                                 {formatTime(currentFlight.arrivalTime)}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-base font-medium text-gray-600 mb-1">
                                 {currentFlight.destination}
                             </div>
-                            <div className="text-xs text-gray-400">
+                            <div className="text-sm text-gray-400">
                                 {formatDate(currentFlight.arrivalTime)}
                             </div>
                         </div>
@@ -106,15 +110,15 @@ export const FlightCard = ({ flight, onFlightSelect, onFlightUpdate }) => {
 
                 {/* Cabin classes and prices */}
                 {currentFlight.offers && currentFlight.offers.length > 0 && (
-                    <div className="mb-4">
-                        <div className="text-sm font-medium text-gray-700 mb-2">Available Classes:</div>
-                        <div className="flex flex-wrap gap-2">
+                    <div className="mb-4 bg-gray-50 rounded-lg p-4">
+                        <div className="text-base font-semibold text-gray-700 mb-3">Available Classes:</div>
+                        <div className="flex flex-wrap gap-3 justify-center">
                             {currentFlight.offers[0].fares?.map((fare, index) => (
-                                <div key={index} className="flex items-center space-x-2 bg-gray-50 rounded-lg px-3 py-2">
-                                    <span className="text-sm font-medium text-gray-700">
+                                <div key={index} className="flex items-center space-x-3 bg-white rounded-lg px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <span className="text-base font-medium text-gray-700">
                                         {fare.cabinClass?.name || 'Economy'}
                                     </span>
-                                    <span className="text-sm font-bold text-gray-900">
+                                    <span className="text-lg font-bold text-blue-600">
                                         €{fare.price}
                                     </span>
                                 </div>

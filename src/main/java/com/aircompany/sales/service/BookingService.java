@@ -1,5 +1,6 @@
 package com.aircompany.sales.service;
 
+import com.aircompany.hr.model.Customer;
 import com.aircompany.sales.dto.CreateReservationDto;
 import com.aircompany.sales.dto.PaymentDto;
 import com.aircompany.sales.model.*;
@@ -41,7 +42,10 @@ public class BookingService {
     private LoyaltyService loyaltyService;
     
     @Autowired
-    private UserService userService;
+    private CustomerService customerService;
+    
+    @Autowired
+    private CustomerRepository customerRepository;
     
     @Autowired
     private NotificationService notificationService;
@@ -49,24 +53,31 @@ public class BookingService {
     /**
      * Complete booking process: create reservation with tickets
      */
+    @Transactional
     public Reservation createReservation(CreateReservationDto createDto) {
-        logger.info("Creating reservation for offer ID: {}", createDto.getOfferId());
+        logger.info("Creating reservation for offer ID: {} and customer ID: {}", 
+                   createDto.getOfferId(), createDto.getCustomerId());
         
         // 1. Validate offer
-        Offer offer = offerRepository.findById(createDto.getOfferId())
+        Offer offer = offerRepository.findByIdWithFares(createDto.getOfferId())
             .orElseThrow(() -> new RuntimeException("Offer not found"));
         
         if (!offer.isValidAndActive()) {
             throw new RuntimeException("Offer is no longer valid or has expired");
         }
         
-        // 2. Check seat availability
+        // 2. Validate and retrieve customer
+        Customer customer = customerRepository.findById(createDto.getCustomerId())
+            .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + createDto.getCustomerId()));
+        
+        // 3. Check seat availability
         validateSeatAvailability(createDto, offer);
         
-        // 3. Create reservation
+        // 4. Create reservation
         Reservation reservation = new Reservation();
         reservation.setReservationNumber(generateReservationNumber());
         reservation.setOffer(offer);
+        reservation.setCustomer(customer);
         reservation.setSpecialRequests(createDto.getSpecialRequests());
         reservation.setStatus(Reservation.ReservationStatus.PENDING);
         
@@ -90,7 +101,9 @@ public class BookingService {
             .orElseThrow(() -> new RuntimeException("Reservation not found"));
         
         // Calculate payment breakdown
-        BigDecimal totalAmount = calculateTotalAmount(reservation);
+        // Use the totalAmount from frontend if provided (includes seat premiums), otherwise calculate from tickets
+        BigDecimal totalAmount = paymentDto.getTotalAmount() != null ? 
+            paymentDto.getTotalAmount() : calculateTotalAmount(reservation);
         BigDecimal loyaltyDiscount = calculateLoyaltyDiscount(paymentDto.getLoyaltyPointsToUse());
         BigDecimal cashAmount = totalAmount.subtract(loyaltyDiscount);
         
@@ -115,9 +128,14 @@ public class BookingService {
             payment.setStatus(Payment.PaymentStatus.COMPLETED);
             reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
             
-            // Update ticket statuses
-            reservation.getTickets().forEach(ticket -> 
-                ticket.setStatus(Ticket.TicketStatus.CONFIRMED));
+            // Update ticket statuses and prices to reflect actual paid amount
+            int ticketCount = reservation.getTickets().size();
+            BigDecimal pricePerTicket = totalAmount.divide(new BigDecimal(ticketCount), 2, java.math.RoundingMode.HALF_UP);
+            
+            reservation.getTickets().forEach(ticket -> {
+                ticket.setStatus(Ticket.TicketStatus.CONFIRMED);
+                ticket.setPrice(pricePerTicket); // Update to actual paid price (including extras like seat selection)
+            });
             
             // Deduct loyalty points if used
             if (paymentDto.getLoyaltyPointsToUse() > 0) {
@@ -140,6 +158,7 @@ public class BookingService {
         }
         
         payment = paymentRepository.save(payment);
+        reservation.setPayment(payment);
         reservationRepository.save(reservation);
         
         logger.info("Payment processed with status: {}", payment.getStatus());
@@ -169,7 +188,7 @@ public class BookingService {
         
         // Award loyalty points for flight completion
         try {
-            userService.awardPointsForReservation(reservation.getCustomer().getId(), reservation.getId());
+            customerService.awardPointsForReservation(reservation.getCustomer().getId(), reservation.getId());
             logger.info("Awarded flight completion points for reservation: {}", reservation.getReservationNumber());
         } catch (Exception e) {
             logger.error("Failed to award flight completion points for reservation {}: {}", 
@@ -228,7 +247,7 @@ public class BookingService {
     private List<Ticket> createTicketsWithPassengers(List<CreateReservationDto.CreateTicketDto> ticketDtos, 
                                                      Reservation reservation, Offer offer) {
         List<Ticket> tickets = new ArrayList<>();
-        BigDecimal ticketPrice = offer.getFinalPrice();
+        BigDecimal ticketPrice = offer.getLowestFarePrice();
         
         for (CreateReservationDto.CreateTicketDto ticketDto : ticketDtos) {
             // Create or find passenger
@@ -318,9 +337,9 @@ public class BookingService {
     }
     
     private void awardLoyaltyPoints(Reservation reservation) {
-        // Use UserService's comprehensive point awarding system
+        // Use CustomerService's comprehensive point awarding system
         try {
-            userService.awardPointsForReservation(reservation.getCustomer().getId(), reservation.getId());
+            customerService.awardPointsForReservation(reservation.getCustomer().getId(), reservation.getId());
             logger.info("Awarded loyalty points for reservation: {}", reservation.getReservationNumber());
         } catch (Exception e) {
             logger.error("Failed to award loyalty points for reservation {}: {}", 

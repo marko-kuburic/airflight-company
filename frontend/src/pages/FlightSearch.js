@@ -29,16 +29,18 @@ export default function FlightSearch() {
   };
 
   return (
-    <div style={{ backgroundColor: "#EEF4FB", minHeight: "100vh", position: "relative" }}>
-      {/* Sidebar */}
-      <Sidebar />
+    <div style={{ display: 'flex', backgroundColor: "#EEF4FB", minHeight: "100vh", overflow: "hidden" }}>
+      {/* Sidebar - Fixed */}
+      <div style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '280px', zIndex: 100 }}>
+        <Sidebar />
+      </div>
       
-      {/* Main content - absolute positioning to avoid sidebar issues */}
+      {/* Main content - Scrollable */}
       <div style={{
-        position: 'absolute',
-        top: '0px',
-        left: '280px',
-        right: '0px',
+        marginLeft: '280px',
+        width: 'calc(100% - 280px)',
+        height: '100vh',
+        overflowY: 'auto',
         padding: '20px'
       }}>
         <h1 

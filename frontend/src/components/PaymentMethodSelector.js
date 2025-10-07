@@ -1,15 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-export function PaymentMethodSelector({ onPaymentChange, totalAmount = 0 }) {
+export function PaymentMethodSelector({ onPaymentChange, totalAmount = 0, loyaltyBalance = 0, savedPaymentMethods = [] }) {
   const [selectedMethod, setSelectedMethod] = useState('card');
+  const [selectedSavedMethod, setSelectedSavedMethod] = useState(null);
   const [cardDetails, setCardDetails] = useState({
     cardNumber: '',
     mmyy: '',
     cvc: ''
   });
   const [loyaltyPoints, setLoyaltyPoints] = useState('');
+  const [maxLoyaltyPoints, setMaxLoyaltyPoints] = useState(0);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+
+  // Calculate max loyalty points that can be used (100 points = $1)
+  useEffect(() => {
+    const maxPointsForAmount = Math.floor(totalAmount * 100); // $1 = 100 points
+    const maxPoints = Math.min(loyaltyBalance, maxPointsForAmount);
+    setMaxLoyaltyPoints(maxPoints);
+  }, [totalAmount, loyaltyBalance]);
+
+  // Calculate loyalty discount when points change
+  useEffect(() => {
+    const points = parseInt(loyaltyPoints) || 0;
+    const discount = points / 100; // 100 points = $1
+    setLoyaltyDiscount(discount);
+  }, [loyaltyPoints]);
 
   // Validation functions
   const validateCardNumber = (value) => {
@@ -138,9 +155,22 @@ export function PaymentMethodSelector({ onPaymentChange, totalAmount = 0 }) {
   };
 
   const handleLoyaltyChange = (value) => {
-    setLoyaltyPoints(value);
+    // Validate and limit loyalty points
+    const points = parseInt(value) || 0;
+    const limitedPoints = Math.min(Math.max(0, points), maxLoyaltyPoints);
+    const limitedValue = limitedPoints > 0 ? limitedPoints.toString() : '';
+    
+    setLoyaltyPoints(limitedValue);
+    
+    const discount = limitedPoints / 100; // 100 points = $1
+    
     if (onPaymentChange) {
-      onPaymentChange({ method: selectedMethod, cardDetails, loyaltyPoints: value });
+      onPaymentChange({ 
+        method: selectedMethod, 
+        cardDetails, 
+        loyaltyPoints: limitedValue,
+        loyaltyDiscount: discount 
+      });
     }
   };
 
@@ -340,18 +370,36 @@ export function PaymentMethodSelector({ onPaymentChange, totalAmount = 0 }) {
 
       {(selectedMethod === 'loyalty' || selectedMethod === 'combined') && (
         <div style={loyaltyContainerStyle}>
-          <label style={labelStyle}>Use loyalty points</label>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ marginBottom: '12px', padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #86efac' }}>
+            <div style={{ fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+              💎 Your Loyalty Balance: <strong>{loyaltyBalance.toLocaleString()} points</strong>
+            </div>
+            <div style={{ fontSize: '12px', color: '#16a34a' }}>
+              = €{(loyaltyBalance / 100).toFixed(2)} discount available • 100 points = €1.00
+            </div>
+            {maxLoyaltyPoints < loyaltyBalance && (
+              <div style={{ fontSize: '12px', color: '#ca8a04', marginTop: '4px' }}>
+                ⚠️ Max {maxLoyaltyPoints.toLocaleString()} points ({((maxLoyaltyPoints / 100).toFixed(2))}€) can be used for this purchase
+              </div>
+            )}
+          </div>
+          
+          <label style={labelStyle}>Points to use (max: {maxLoyaltyPoints.toLocaleString()})</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="number"
               value={loyaltyPoints}
               onChange={(e) => handleLoyaltyChange(e.target.value)}
-              placeholder="e.g. 1200"
+              placeholder={`e.g. ${Math.min(1000, maxLoyaltyPoints)}`}
+              min="0"
+              max={maxLoyaltyPoints}
               style={loyaltyInputStyle}
             />
-          </div>
-          <div style={balanceStyle}>
-            Balance: 3,450 pts
+            {loyaltyPoints > 0 && (
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>
+                = €{loyaltyDiscount.toFixed(2)} off
+              </div>
+            )}
           </div>
         </div>
       )}

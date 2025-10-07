@@ -16,16 +16,14 @@ export default function BookingDetails() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Get flight data from route state or use sample data
-  const selectedFlight = location.state?.selectedFlight || {
-    flightNumber: 'AC101',
-    route: 'BEG → CDG',
-    departure: '08:10',
-    arrival: '10:40',
-    class: 'Economy',
-    fareIncludes: '1 carry-on + 1 checked',
-    price: '€250'
-  };
+  // Get flight data from route state or redirect to search
+  const selectedFlight = location.state?.selectedFlight;
+  
+  // Redirect to search if no flight data
+  if (!selectedFlight) {
+    navigate('/search');
+    return null;
+  }
 
   const handlePassengerFormChange = (data) => {
     setPassengerData(data);

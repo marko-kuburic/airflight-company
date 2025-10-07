@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.aircompany.sales.model.Reservation;
 import com.aircompany.sales.model.Passenger;
@@ -42,6 +43,7 @@ public class Ticket {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reservation_id")
+    @JsonIgnore
     private Reservation reservation;
     
     @ManyToOne(fetch = FetchType.LAZY)

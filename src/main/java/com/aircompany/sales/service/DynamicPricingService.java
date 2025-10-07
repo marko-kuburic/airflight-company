@@ -112,15 +112,23 @@ public class DynamicPricingService {
         // Apply time-based multiplier (early booking vs last minute)
         BigDecimal timeMultiplier = calculateTimeBasedMultiplier(flight.getDepTime());
         
+        // Apply time-of-day multiplier (early morning/late night cheaper)
+        BigDecimal timeOfDayMultiplier = calculateTimeOfDayMultiplier(flight.getDepTime());
+        
+        // Apply micro-fluctuation (±$0.50 - $2.00 per refresh to simulate real-time changes)
+        BigDecimal microFluctuation = calculateMicroFluctuation(flight.getId());
+        
         // Calculate final price
         BigDecimal finalPrice = basePrice
             .multiply(demandMultiplier)
             .multiply(seasonalMultiplier)
             .multiply(weekendMultiplier)
-            .multiply(timeMultiplier);
+            .multiply(timeMultiplier)
+            .multiply(timeOfDayMultiplier)
+            .add(microFluctuation);
         
-        logger.debug("Dynamic pricing for flight {}: base={}, demand={}, season={}, weekend={}, time={}, final={}", 
-            flight.getId(), basePrice, demandMultiplier, seasonalMultiplier, weekendMultiplier, timeMultiplier, finalPrice);
+        logger.debug("Dynamic pricing for flight {}: base={}, demand={}, season={}, weekend={}, time={}, timeOfDay={}, fluctuation={}, final={}", 
+            flight.getId(), basePrice, demandMultiplier, seasonalMultiplier, weekendMultiplier, timeMultiplier, timeOfDayMultiplier, microFluctuation, finalPrice);
         
         return finalPrice.setScale(2, RoundingMode.HALF_UP);
     }
@@ -229,6 +237,50 @@ public class DynamicPricingService {
         }
         
         return BigDecimal.ONE; // Standard pricing for normal booking window
+    }
+    
+    /**
+     * Calculate time-of-day multiplier
+     * Early morning (00:00-06:00) and late night (22:00-23:59): 10% cheaper
+     * Peak hours (07:00-09:00, 17:00-20:00): 5% more expensive
+     * Normal hours: standard pricing
+     */
+    private BigDecimal calculateTimeOfDayMultiplier(LocalDateTime departureTime) {
+        int hour = departureTime.getHour();
+        
+        if (hour >= 0 && hour < 6 || hour >= 22) {
+            // Red-eye flights: cheaper
+            return new BigDecimal("0.90"); // 10% discount
+        } else if ((hour >= 7 && hour < 10) || (hour >= 17 && hour < 21)) {
+            // Peak business hours: more expensive
+            return new BigDecimal("1.05"); // 5% premium
+        }
+        
+        // Normal hours
+        return BigDecimal.ONE;
+    }
+    
+    /**
+     * Calculate micro-fluctuation to simulate real-time price changes
+     * Adds small random variations (±$0.50 to ±$2.00) based on:
+     * - Current timestamp (changes every refresh)
+     * - Flight ID (consistent per flight but different across flights)
+     * - Market volatility simulation
+     */
+    private BigDecimal calculateMicroFluctuation(Long flightId) {
+        // Use current time in seconds to create fluctuation that changes over time
+        long currentTimeSeconds = System.currentTimeMillis() / 1000;
+        
+        // Create a pseudo-random seed that changes every ~30 seconds
+        // This ensures prices fluctuate but not TOO rapidly
+        long seed = (currentTimeSeconds / 30) + flightId;
+        java.util.Random random = new java.util.Random(seed);
+        
+        // Generate fluctuation between -2.00 and +2.00
+        double fluctuationRange = 4.0; // Total range: $4 (from -2 to +2)
+        double fluctuation = (random.nextDouble() * fluctuationRange) - 2.0;
+        
+        return BigDecimal.valueOf(fluctuation).setScale(2, RoundingMode.HALF_UP);
     }
     
     /**

@@ -335,8 +335,8 @@ public class FlightDataInitializer implements CommandLineRunner {
                 
                 entityManager.persist(flight);
                 
-                // Create dynamic pricing offer for this flight
-                createDynamicPricingOffer(flight);
+                // Offers will be created dynamically on search - no need to create on startup
+                // createDynamicPricingOffer(flight);
                 
                 flightCounter++;
                 
@@ -361,90 +361,8 @@ public class FlightDataInitializer implements CommandLineRunner {
         System.out.println("✓ Average flights per day: " + (targetFlights / daysToSpread));
     }
     
-    private void createDynamicPricingOffer(Flight flight) {
-        // According to specification: "Pri svakoj pretrazi letova sistem generiše ponude sa aktuelnim cenama"
-        // Create one offer per flight with multiple fares for different cabin classes
-        
-        Offer offer = new Offer();
-        offer.setTitle("Flight " + flight.getFlightNumber() + " - Dynamic Pricing");
-        offer.setDescription("Dynamic pricing offer for all cabin classes on flight " + flight.getFlightNumber());
-        offer.setDiscountPercentage(new BigDecimal("0.00")); // Will be calculated dynamically
-        offer.setStartDate(LocalDateTime.now());
-        
-        // Specification: "Svaka ponuda ima ograničen rok važenja (npr. 10 minuta)"
-        offer.setExpiresAt(LocalDateTime.now().plusMinutes(10));
-        offer.setEndDate(flight.getDepTime().minusHours(1)); // Valid until 1 hour before departure
-        offer.setFlight(flight);
-        offer.setBasePrice(new BigDecimal("200")); // Base economy price
-        entityManager.persist(offer);
-        
-        // Get cabin classes
-        List<CabinClass> cabinClasses = entityManager.createQuery("SELECT c FROM CabinClass c ORDER BY c.basePrice", CabinClass.class).getResultList();
-        
-        // Create fares for each cabin class with dynamic pricing
-        List<Fare> fares = new ArrayList<>();
-        
-        for (CabinClass cabinClass : cabinClasses) {
-            Fare fare = new Fare();
-            fare.setCabinClass(cabinClass);
-            fare.setOffer(offer);
-            
-            // Apply dynamic pricing based on specification factors
-            BigDecimal dynamicPrice = calculateDynamicPrice(cabinClass.getBasePrice(), flight);
-            fare.setPrice(dynamicPrice);
-            
-            entityManager.persist(fare);
-            fares.add(fare);
-        }
-        
-        // Set fares to offer
-        offer.setFares(fares);
-    }
-    
-    private BigDecimal calculateDynamicPrice(BigDecimal basePrice, Flight flight) {
-        // Implement dynamic pricing according to specification 3.4.1
-        double multiplier = 1.0;
-        
-        // Factor 1: Demand simulation (random for now)
-        // "Ukoliko je prodaja usporena, sistem može ponuditi niže cene"
-        // "Ako je potražnja velika, cena raste"
-        double demandFactor = 0.8 + (random.nextDouble() * 0.6); // 0.8 to 1.4
-        
-        // Factor 2: Season effect
-        // "U vreme praznika, školskih raspusta cene se automatski uvećavaju"
-        LocalDateTime depTime = flight.getDepTime();
-        double seasonFactor = 1.0;
-        
-        // Weekend effect: "karте петком, суботом и недељом скупље"
-        int dayOfWeek = depTime.getDayOfWeek().getValue();
-        if (dayOfWeek >= 5) { // Friday, Saturday, Sunday
-            seasonFactor = 1.2;
-        }
-        
-        // Factor 3: Time until departure
-        // "last-minute popust" ili "rana kupovina popust"
-        long hoursUntilDeparture = java.time.Duration.between(LocalDateTime.now(), depTime).toHours();
-        double timeFactor = 1.0;
-        
-        if (hoursUntilDeparture < 24) {
-            // Last minute - može biti jeftiniji ili skuplji
-            timeFactor = random.nextBoolean() ? 0.7 : 1.5;
-        } else if (hoursUntilDeparture > 720) { // 30 days
-            // Early booking discount
-            timeFactor = 0.9;
-        }
-        
-        multiplier = demandFactor * seasonFactor * timeFactor;
-        
-        // Apply multiplier to base price
-        BigDecimal finalPrice = basePrice.multiply(new BigDecimal(multiplier));
-        
-        // Round to nearest 10
-        return finalPrice.setScale(0, java.math.RoundingMode.HALF_UP)
-                       .divide(new BigDecimal("10"))
-                       .setScale(0, java.math.RoundingMode.HALF_UP)
-                       .multiply(new BigDecimal("10"));
-    }
+    // REMOVED: Offers are now created dynamically on search, not on startup
+    // This ensures fresh offers with correct expiration times are generated per search
     
     // Simple distance calculation using Haversine formula
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {

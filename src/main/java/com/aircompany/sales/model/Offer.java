@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.aircompany.flight.model.Flight;
 import java.math.BigDecimal;
@@ -58,12 +59,15 @@ public class Offer {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "flight_id")
+    @JsonIgnore
     private Flight flight;
     
     @OneToMany(mappedBy = "offer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Fare> fares = new ArrayList<>();
     
     @OneToMany(mappedBy = "offer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Reservation> reservations = new ArrayList<>();
     
     // Constructors
@@ -205,5 +209,15 @@ public class Offer {
         }
         BigDecimal discount = basePrice.multiply(discountPercentage.divide(new BigDecimal("100")));
         return basePrice.subtract(discount);
+    }
+    
+    public BigDecimal getLowestFarePrice() {
+        if (fares == null || fares.isEmpty()) {
+            return getFinalPrice();
+        }
+        return fares.stream()
+            .map(Fare::getPrice)
+            .min(BigDecimal::compareTo)
+            .orElse(getFinalPrice());
     }
 }

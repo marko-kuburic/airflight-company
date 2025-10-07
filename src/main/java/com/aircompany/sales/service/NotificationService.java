@@ -244,4 +244,13 @@ public class NotificationService {
             throw e;
         }
     }
+    
+    // Customer-specific method aliases for better naming consistency
+    public List<Notification> getCustomerNotifications(Long customerId) {
+        return getUserNotifications(customerId);
+    }
+    
+    public void clearNotificationsForCustomer(Long customerId) {
+        clearNotificationsForUser(customerId);
+    }
 }

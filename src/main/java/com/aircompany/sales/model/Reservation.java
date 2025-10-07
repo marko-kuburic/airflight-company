@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.aircompany.hr.model.Customer;
 import java.time.LocalDateTime;
@@ -41,6 +42,7 @@ public class Reservation {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "offer_id")
+    @JsonIgnore
     private Offer offer;
     
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -51,10 +53,12 @@ public class Reservation {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ancillary_id")
+    @JsonIgnore
     private Ancillary ancillary;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id")
+    @JsonIgnore
     private Customer customer;
     
     // Constructors
