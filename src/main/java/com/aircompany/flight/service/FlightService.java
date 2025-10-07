@@ -2,6 +2,8 @@ package com.aircompany.flight.service;
 
 import com.aircompany.flight.model.Flight;
 import com.aircompany.flight.model.Aircraft;
+import com.aircompany.flight.dto.FlightRequestDto;
+import com.aircompany.flight.dto.FlightResponseDto;
 import com.aircompany.sales.dto.FlightSearchRequest;
 import com.aircompany.sales.dto.FlightSearchResponse;
 import com.aircompany.sales.model.Offer;
@@ -380,5 +382,242 @@ public class FlightService {
         config.put("aisleAfter", Arrays.asList("C")); // Aisle after seat C
         
         return config;
+    }
+    
+    // ========== FLIGHT MANAGEMENT METHODS ==========
+    
+    /**
+     * Get flights by status
+     */
+    @Transactional(readOnly = true)
+    public List<FlightResponseDto> getFlightsByStatus(Flight.FlightStatus status) {
+        String jpql = "SELECT f FROM Flight f WHERE f.status = :status ORDER BY f.depTime ASC";
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setParameter("status", status);
+        List<Flight> flights = query.getResultList();
+        
+        return flights.stream()
+            .map(this::convertToFlightResponseDto)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get flights by date range
+     */
+    @Transactional(readOnly = true)
+    public List<FlightResponseDto> getFlightsByDateRange(LocalDateTime startTime, LocalDateTime endTime) {
+        String jpql = "SELECT f FROM Flight f WHERE f.depTime >= :startTime AND f.depTime <= :endTime ORDER BY f.depTime ASC";
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setParameter("startTime", startTime);
+        query.setParameter("endTime", endTime);
+        List<Flight> flights = query.getResultList();
+        
+        return flights.stream()
+            .map(this::convertToFlightResponseDto)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get flights by aircraft ID
+     */
+    @Transactional(readOnly = true)
+    public List<FlightResponseDto> getFlightsByAircraft(Long aircraftId) {
+        String jpql = "SELECT f FROM Flight f WHERE f.aircraft.id = :aircraftId ORDER BY f.depTime ASC";
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setParameter("aircraftId", aircraftId);
+        List<Flight> flights = query.getResultList();
+        
+        return flights.stream()
+            .map(this::convertToFlightResponseDto)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get flights by route ID
+     */
+    @Transactional(readOnly = true)
+    public List<FlightResponseDto> getFlightsByRoute(Long routeId) {
+        String jpql = "SELECT f FROM Flight f WHERE f.route.id = :routeId ORDER BY f.depTime ASC";
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setParameter("routeId", routeId);
+        List<Flight> flights = query.getResultList();
+        
+        return flights.stream()
+            .map(this::convertToFlightResponseDto)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get flights by dispatcher ID
+     */
+    @Transactional(readOnly = true)
+    public List<FlightResponseDto> getFlightsByDispatcher(Long dispatcherId) {
+        String jpql = "SELECT f FROM Flight f WHERE f.flightDispatcher.id = :dispatcherId ORDER BY f.depTime ASC";
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setParameter("dispatcherId", dispatcherId);
+        List<Flight> flights = query.getResultList();
+        
+        return flights.stream()
+            .map(this::convertToFlightResponseDto)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get flight count by status
+     */
+    @Transactional(readOnly = true)
+    public Long getFlightCountByStatus(Flight.FlightStatus status) {
+        String jpql = "SELECT COUNT(f) FROM Flight f WHERE f.status = :status";
+        TypedQuery<Long> query = entityManager.createQuery(jpql, Long.class);
+        query.setParameter("status", status);
+        return query.getSingleResult();
+    }
+    
+    /**
+     * Create a new flight
+     */
+    @Transactional
+    public FlightResponseDto createFlight(FlightRequestDto requestDto) {
+        Flight flight = new Flight();
+        
+        // Set basic flight information
+        flight.setFlightNumber(requestDto.getFlightNumber());
+        flight.setDepTime(requestDto.getDepTime());
+        flight.setArrTime(requestDto.getArrTime());
+        flight.setStatus(requestDto.getStatus());
+        
+        // Set aircraft
+        if (requestDto.getAircraftId() != null) {
+            Aircraft aircraft = entityManager.find(Aircraft.class, requestDto.getAircraftId());
+            if (aircraft == null) {
+                throw new IllegalArgumentException("Aircraft not found with ID: " + requestDto.getAircraftId());
+            }
+            flight.setAircraft(aircraft);
+        }
+        
+        // Set route (you may need to implement this based on your Route entity)
+        // flight.setRoute(route);
+        
+        entityManager.persist(flight);
+        entityManager.flush();
+        
+        return convertToFlightResponseDto(flight);
+    }
+    
+    /**
+     * Update flight
+     */
+    @Transactional
+    public Optional<FlightResponseDto> updateFlight(Long id, FlightRequestDto requestDto) {
+        Flight flight = entityManager.find(Flight.class, id);
+        if (flight == null) {
+            return Optional.empty();
+        }
+        
+        // Update flight information
+        if (requestDto.getFlightNumber() != null) {
+            flight.setFlightNumber(requestDto.getFlightNumber());
+        }
+        if (requestDto.getDepTime() != null) {
+            flight.setDepTime(requestDto.getDepTime());
+        }
+        if (requestDto.getArrTime() != null) {
+            flight.setArrTime(requestDto.getArrTime());
+        }
+        if (requestDto.getStatus() != null) {
+            flight.setStatus(requestDto.getStatus());
+        }
+        
+        // Update aircraft if provided
+        if (requestDto.getAircraftId() != null) {
+            Aircraft aircraft = entityManager.find(Aircraft.class, requestDto.getAircraftId());
+            if (aircraft == null) {
+                throw new IllegalArgumentException("Aircraft not found with ID: " + requestDto.getAircraftId());
+            }
+            flight.setAircraft(aircraft);
+        }
+        
+        entityManager.merge(flight);
+        
+        return Optional.of(convertToFlightResponseDto(flight));
+    }
+    
+    /**
+     * Update flight status
+     */
+    @Transactional
+    public Optional<FlightResponseDto> updateFlightStatus(Long id, Flight.FlightStatus status) {
+        Flight flight = entityManager.find(Flight.class, id);
+        if (flight == null) {
+            return Optional.empty();
+        }
+        
+        flight.setStatus(status);
+        entityManager.merge(flight);
+        
+        return Optional.of(convertToFlightResponseDto(flight));
+    }
+    
+    /**
+     * Delete flight
+     */
+    @Transactional
+    public boolean deleteFlight(Long id) {
+        Flight flight = entityManager.find(Flight.class, id);
+        if (flight == null) {
+            return false;
+        }
+        
+        entityManager.remove(flight);
+        return true;
+    }
+    
+    /**
+     * Get occupied seats for a flight
+     */
+    @Transactional(readOnly = true)
+    public List<String> getOccupiedSeats(Long flightId) {
+        // This is a simplified implementation
+        // In a real system, you would query the reservations/tickets table
+        // For now, return an empty list (no occupied seats)
+        return new ArrayList<>();
+    }
+    
+    /**
+     * Check if a seat is available
+     */
+    @Transactional(readOnly = true)
+    public boolean isSeatAvailable(Long flightId, String seatNumber) {
+        // This is a simplified implementation
+        // In a real system, you would check against the reservations/tickets table
+        // For now, return true (all seats available)
+        return true;
+    }
+    
+    /**
+     * Convert Flight entity to FlightResponseDto
+     */
+    private FlightResponseDto convertToFlightResponseDto(Flight flight) {
+        FlightResponseDto dto = new FlightResponseDto();
+        dto.setId(flight.getId());
+        dto.setFlightNumber(flight.getFlightNumber());
+        dto.setDepTime(flight.getDepTime());
+        dto.setArrTime(flight.getArrTime());
+        dto.setStatus(flight.getStatus());
+        
+        if (flight.getAircraft() != null) {
+            dto.setAircraftId(flight.getAircraft().getId());
+            dto.setAircraftModel(flight.getAircraft().getModel());
+        }
+        
+        if (flight.getRoute() != null) {
+            dto.setRouteId(flight.getRoute().getId());
+        }
+        
+        if (flight.getFlightDispatcher() != null) {
+            dto.setFlightDispatcherId(flight.getFlightDispatcher().getId());
+        }
+        
+        return dto;
     }
 }

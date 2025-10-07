@@ -288,6 +288,17 @@ public class FlightDataInitializer implements CommandLineRunner {
             return;
         }
         
+        // Check if we have routes and aircraft
+        if (routes.isEmpty()) {
+            System.out.println("No routes found. Cannot create flights without routes.");
+            return;
+        }
+        
+        if (aircraft.isEmpty()) {
+            System.out.println("No aircraft found. Cannot create flights without aircraft.");
+            return;
+        }
+        
         System.out.println("Creating " + flightsToCreate + " flights across " + routes.size() + " routes...");
         
         // Create flights distributed over 20 days
