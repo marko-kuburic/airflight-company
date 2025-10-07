@@ -50,6 +50,13 @@ public class Ticket {
     @JoinColumn(name = "passenger_id")
     private Passenger passenger;
     
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "cabin_class_id")
+    private CabinClass cabinClass;
+    
+    @Column(name = "seat_premium")
+    private BigDecimal seatPremium; // Extra charge for premium seat
+    
     // Constructors
     public Ticket() {}
     
@@ -123,6 +130,22 @@ public class Ticket {
     
     public void setPassenger(Passenger passenger) {
         this.passenger = passenger;
+    }
+    
+    public CabinClass getCabinClass() {
+        return cabinClass;
+    }
+    
+    public void setCabinClass(CabinClass cabinClass) {
+        this.cabinClass = cabinClass;
+    }
+    
+    public BigDecimal getSeatPremium() {
+        return seatPremium;
+    }
+    
+    public void setSeatPremium(BigDecimal seatPremium) {
+        this.seatPremium = seatPremium;
     }
     
     // Helper method to get fare through reservation

@@ -13,6 +13,7 @@ import EditTicket from './pages/EditTicket';
 import MyProfile from './pages/MyProfile';
 import LoyaltyProgram from './pages/LoyaltyProgram';
 import Notifications from './pages/Notifications';
+import Analytics from './pages/Analytics';
 import { Sidebar } from './components/Sidebar';
 import './App.css';
 
@@ -34,6 +35,7 @@ function App() {
           <Route path="/profile" element={<MyProfile />} />
           <Route path="/loyalty" element={<LoyaltyProgram />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/analytics" element={<Analytics />} />
         </Routes>
       </div>
     </Router>

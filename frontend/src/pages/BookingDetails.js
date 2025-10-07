@@ -4,11 +4,13 @@ import { Layout } from '../components/Layout';
 import { FlightSummaryCard } from '../components/FlightSummaryCard';
 import { PassengerDetailsForm } from '../components/PassengerDetailsForm';
 import { SeatSelection } from '../components/SeatSelection';
+import { OfferTimer } from '../components/OfferTimer';
 import toast from 'react-hot-toast';
 
 export default function BookingDetails() {
   const [passengerData, setPassengerData] = useState(null);
   const [selectedSeat, setSelectedSeat] = useState(null);
+  const [seatInfo, setSeatInfo] = useState(null); // Store full seat info (isPremium, price)
   const [seatPrice, setSeatPrice] = useState(0);
   const [isFormValid, setIsFormValid] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -19,11 +21,43 @@ export default function BookingDetails() {
   // Get flight data from route state or redirect to search
   const selectedFlight = location.state?.selectedFlight;
   
+  // Debug log to see what flight data we have
+  useEffect(() => {
+    if (selectedFlight) {
+      console.log('BookingDetails - selectedFlight:', selectedFlight);
+      console.log('BookingDetails - Flight ID being passed to SeatSelection:', selectedFlight.id);
+    }
+  }, [selectedFlight]);
+  
   // Redirect to search if no flight data
   if (!selectedFlight) {
     navigate('/search');
     return null;
   }
+
+  // Check if offer has expired
+  const checkOfferExpiration = () => {
+    if (selectedFlight?.offers && selectedFlight.offers.length > 0) {
+      const offer = selectedFlight.offers[0];
+      if (offer?.expiresAt) {
+        const now = new Date();
+        const expireTime = new Date(offer.expiresAt + 'Z');
+        return now > expireTime;
+      }
+    }
+    return false;
+  };
+
+  // Handle offer expiration - redirect to search
+  const handleOfferExpiration = () => {
+    toast.error('This offer has expired. Please search for flights again.', {
+      duration: 5000,
+      icon: '⏰'
+    });
+    setTimeout(() => {
+      navigate('/search');
+    }, 2000);
+  };
 
   const handlePassengerFormChange = (data) => {
     setPassengerData(data);
@@ -34,8 +68,9 @@ export default function BookingDetails() {
     setFormErrors(errors);
   };
 
-  const handleSeatSelection = (seatNumber, seatInfo) => {
+  const handleSeatSelection = (seatNumber, seatInfoData) => {
     setSelectedSeat(seatNumber);
+    setSeatInfo(seatInfoData); // Store isPremium and price
   };
 
   const handleSeatPriceChange = (price) => {
@@ -85,6 +120,7 @@ export default function BookingDetails() {
         selectedFlight,
         passengerData,
         selectedSeat,
+        seatInfo, // Include full seat info (isPremium, price)
         seatPrice,
         totalPrice
       } 
@@ -165,6 +201,19 @@ export default function BookingDetails() {
       <div style={pageStyle}>
         <h1 style={headerStyle}>Search & Book Flights — Passenger Details</h1>
         
+        {/* Offer expiration timer */}
+        {selectedFlight?.offers && selectedFlight.offers.length > 0 && (
+          <div style={{ marginBottom: '16px' }}>
+            <OfferTimer 
+              flight={selectedFlight} 
+              onOfferRefresh={(updatedFlight) => {
+                // Optionally update flight data if offer is refreshed
+                console.log('Offer refreshed:', updatedFlight);
+              }}
+            />
+          </div>
+        )}
+        
         <FlightSummaryCard flight={selectedFlight} />
         
         <div style={mainContentStyle}>
@@ -180,6 +229,7 @@ export default function BookingDetails() {
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Seat Selection</h2>
             <SeatSelection 
+              flightId={selectedFlight.flightId}
               onSeatSelect={handleSeatSelection}
               onPriceChange={handleSeatPriceChange}
             />

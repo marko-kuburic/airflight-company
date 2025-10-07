@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -75,6 +76,10 @@ public class CreateReservationDto {
         
         private String seatNumber;
         
+        private Boolean isPremium; // Whether this is a premium seat
+        
+        private BigDecimal seatPrice; // Extra charge for this seat
+        
         // Constructors
         public CreateTicketDto() {}
         
@@ -98,6 +103,22 @@ public class CreateReservationDto {
         
         public void setSeatNumber(String seatNumber) {
             this.seatNumber = seatNumber;
+        }
+        
+        public Boolean getIsPremium() {
+            return isPremium;
+        }
+        
+        public void setIsPremium(Boolean isPremium) {
+            this.isPremium = isPremium;
+        }
+        
+        public BigDecimal getSeatPrice() {
+            return seatPrice;
+        }
+        
+        public void setSeatPrice(BigDecimal seatPrice) {
+            this.seatPrice = seatPrice;
         }
     }
 }

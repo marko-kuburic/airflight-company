@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { FlightSummaryCard } from '../components/FlightSummaryCard';
 import { PaymentMethodSelector } from '../components/PaymentMethodSelector';
+import { OfferTimer } from '../components/OfferTimer';
 import { bookingAPI, authAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -39,7 +40,7 @@ export default function Payment() {
 
           // Fetch saved payment methods
           try {
-            const paymentMethodsResponse = await authAPI.getSavedPaymentMethods(userData.id);
+            const paymentMethodsResponse = await authAPI.getCustomerPaymentMethods(userData.id);
             setSavedPaymentMethods(paymentMethodsResponse.data || []);
           } catch (error) {
             console.warn('Could not fetch saved payment methods:', error);
@@ -77,7 +78,41 @@ export default function Payment() {
       return;
     }
 
-    // Card validation
+    // Loyalty points validation
+    const loyaltyPointsUsed = parseInt(paymentData.loyaltyPoints || '0');
+    const loyaltyDiscount = loyaltyPointsUsed / 100; // 100 points = $1
+    const remainingAmount = calculatedTotal - loyaltyDiscount;
+
+    if (paymentData.method === 'loyalty') {
+      // Full payment with loyalty points - must have enough points
+      if (loyaltyPointsUsed === 0) {
+        toast.error('Please enter the number of loyalty points to use');
+        return;
+      }
+      if (loyaltyDiscount < calculatedTotal) {
+        toast.error(`Insufficient loyalty points. You need ${Math.ceil(calculatedTotal * 100).toLocaleString()} points to pay the full amount.`);
+        return;
+      }
+    }
+
+    if (paymentData.method === 'combined') {
+      // Combined payment - loyalty points + card
+      if (loyaltyPointsUsed === 0) {
+        toast.error('Please enter loyalty points to use for combined payment');
+        return;
+      }
+      if (remainingAmount <= 0) {
+        toast.error('You have enough loyalty points to pay the full amount. Please use "Loyalty points" payment method instead.');
+        return;
+      }
+      // Card details are required for remaining amount
+      if (!paymentData.isValid || !paymentData.cardDetails?.cardNumber || !paymentData.cardDetails?.mmyy || !paymentData.cardDetails?.cvc) {
+        toast.error('Card details are required to pay the remaining amount of €' + remainingAmount.toFixed(2));
+        return;
+      }
+    }
+
+    // Card validation for card-only and combined payments
     if (paymentData.method === 'card' || paymentData.method === 'combined') {
       if (!paymentData.isValid) {
         toast.error('Please complete all required card fields correctly');
@@ -128,6 +163,8 @@ export default function Payment() {
         return;
       }
       
+      const seatInfo = location.state?.seatInfo || {};
+      
       const reservationData = {
         customerId: userData.id,
         offerId: offerId,
@@ -140,7 +177,9 @@ export default function Payment() {
             phone: passengerData.phone,
             email: passengerData.email
           },
-          seatNumber: selectedSeat || null
+          seatNumber: selectedSeat || null,
+          isPremium: seatInfo.isPremium || false,
+          seatPrice: seatInfo.price || 0
         }],
         specialRequests: null
       };
@@ -170,15 +209,30 @@ export default function Payment() {
       }
 
       // Now process payment with proper backend format
+      const loyaltyPointsUsed = paymentData.method === 'loyalty' || paymentData.method === 'combined' 
+        ? parseInt(paymentData.loyaltyPoints || '0') : 0;
+      
+      // Calculate cash amount based on payment method
+      let cashAmount = 0;
+      if (paymentData.method === 'card') {
+        // Full amount paid by card
+        cashAmount = calculatedTotal;
+      } else if (paymentData.method === 'loyalty') {
+        // Full amount paid by loyalty points (no cash/card needed)
+        cashAmount = 0;
+      } else if (paymentData.method === 'combined') {
+        // Remaining amount after loyalty points is paid by card
+        cashAmount = Math.max(0, calculatedTotal - loyaltyPointsUsed);
+      }
+      
       const paymentDataForBackend = {
         reservationId: reservationResponse.data.id,
         totalAmount: calculatedTotal,
         paymentMethod: paymentData.method === 'card' ? 'CREDIT_CARD' : 
                       paymentData.method === 'loyalty' ? 'LOYALTY_POINTS' : 
                       paymentData.method === 'combined' ? 'COMBINED' : 'CREDIT_CARD', // Map frontend values to backend enum
-        loyaltyPointsToUse: paymentData.method === 'loyalty' || paymentData.method === 'combined' 
-          ? parseInt(paymentData.loyaltyPoints || '0') : 0,
-        cashAmount: calculatedTotal,
+        loyaltyPointsToUse: loyaltyPointsUsed,
+        cashAmount: cashAmount,
         ...(paymentData.method === 'card' || paymentData.method === 'combined' ? {
           cardNumber: paymentData.cardDetails.cardNumber.replace(/\s/g, ''),
           cardHolderName: `${passengerData.firstName} ${passengerData.lastName}`,
@@ -380,6 +434,18 @@ export default function Payment() {
     <Layout>
       <div style={pageStyle}>
         <h1 style={headerStyle}>Payment</h1>
+        
+        {/* Offer expiration timer */}
+        {selectedFlight?.offers && selectedFlight.offers.length > 0 && (
+          <div style={{ marginBottom: '16px' }}>
+            <OfferTimer 
+              flight={selectedFlight} 
+              onOfferRefresh={(updatedFlight) => {
+                console.log('Offer refreshed:', updatedFlight);
+              }}
+            />
+          </div>
+        )}
         
         {/* Flight Summary */}
         <FlightSummaryCard flight={selectedFlight} />

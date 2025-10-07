@@ -3,6 +3,7 @@ package com.aircompany.sales.service;
 import com.aircompany.hr.model.Customer;
 import com.aircompany.sales.dto.CreateReservationDto;
 import com.aircompany.sales.dto.PaymentDto;
+import com.aircompany.sales.exception.SeatAlreadyTakenException;
 import com.aircompany.sales.model.*;
 import com.aircompany.sales.repository.*;
 import org.slf4j.Logger;
@@ -238,7 +239,7 @@ public class BookingService {
             if (ticketDto.getSeatNumber() != null) {
                 boolean seatTaken = ticketRepository.isSeatTaken(flightId, ticketDto.getSeatNumber());
                 if (seatTaken) {
-                    throw new RuntimeException("Seat " + ticketDto.getSeatNumber() + " is already taken");
+                    throw new SeatAlreadyTakenException(ticketDto.getSeatNumber());
                 }
             }
         }
@@ -247,16 +248,65 @@ public class BookingService {
     private List<Ticket> createTicketsWithPassengers(List<CreateReservationDto.CreateTicketDto> ticketDtos, 
                                                      Reservation reservation, Offer offer) {
         List<Ticket> tickets = new ArrayList<>();
-        BigDecimal ticketPrice = offer.getLowestFarePrice();
         
         for (CreateReservationDto.CreateTicketDto ticketDto : ticketDtos) {
             // Create or find passenger
             Passenger passenger = findOrCreatePassenger(ticketDto.getPassenger());
             
+            // Determine cabin class based on premium seat selection
+            Boolean isPremium = ticketDto.getIsPremium();
+            CabinClass cabinClass;
+            BigDecimal ticketPrice;
+            
+            if (isPremium != null && isPremium) {
+                // Premium seat = Business class
+                // Find business class from offer fares
+                cabinClass = offer.getFares().stream()
+                    .map(Fare::getCabinClass)
+                    .filter(cc -> "Business".equalsIgnoreCase(cc.getName()))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        // Fallback: try to find any non-economy class, or use the most expensive fare
+                        return offer.getFares().stream()
+                            .map(Fare::getCabinClass)
+                            .filter(cc -> !"Economy".equalsIgnoreCase(cc.getName()))
+                            .findFirst()
+                            .orElse(offer.getFares().get(0).getCabinClass());
+                    });
+                
+                // Use business class fare price if available, otherwise use lowest + premium
+                ticketPrice = offer.getFares().stream()
+                    .filter(f -> "Business".equalsIgnoreCase(f.getCabinClass().getName()))
+                    .findFirst()
+                    .map(Fare::getPrice)
+                    .orElse(offer.getLowestFarePrice());
+            } else {
+                // Standard seat = Economy class
+                cabinClass = offer.getFares().stream()
+                    .map(Fare::getCabinClass)
+                    .filter(cc -> "Economy".equalsIgnoreCase(cc.getName()))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        // Fallback: use the cheapest fare's cabin class
+                        return offer.getFares().stream()
+                            .min((f1, f2) -> f1.getPrice().compareTo(f2.getPrice()))
+                            .map(Fare::getCabinClass)
+                            .orElse(offer.getFares().get(0).getCabinClass());
+                    });
+                
+                ticketPrice = offer.getLowestFarePrice();
+            }
+            
             // Create ticket
             Ticket ticket = new Ticket(ticketPrice, reservation, passenger);
             ticket.setSeatNumber(ticketDto.getSeatNumber());
+            ticket.setCabinClass(cabinClass);
             ticket.setStatus(Ticket.TicketStatus.CREATED);
+            
+            // Set seat premium if provided
+            if (ticketDto.getSeatPrice() != null && ticketDto.getSeatPrice().compareTo(BigDecimal.ZERO) > 0) {
+                ticket.setSeatPremium(ticketDto.getSeatPrice());
+            }
             
             ticket = ticketRepository.save(ticket);
             tickets.add(ticket);

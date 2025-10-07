@@ -3,6 +3,7 @@ package com.aircompany.sales.controller;
 import com.aircompany.sales.dto.CreateReservationDto;
 import com.aircompany.sales.dto.PaymentDto;
 import com.aircompany.sales.dto.ReservationResponse;
+import com.aircompany.sales.exception.SeatAlreadyTakenException;
 import com.aircompany.sales.model.Reservation;
 import com.aircompany.sales.model.Payment;
 import com.aircompany.sales.model.Ticket;
@@ -54,6 +55,9 @@ public class BookingController {
             response.put("status", reservation.getStatus().toString());
             
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (SeatAlreadyTakenException e) {
+            logger.error("Seat already taken: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Error: " + e.getMessage());
         } catch (Exception e) {
             logger.error("Error creating reservation: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Error creating reservation: " + e.getMessage());
@@ -292,6 +296,17 @@ public class BookingController {
             ticketMap.put("status", ticket.getStatus().toString());
             ticketMap.put("seatNumber", ticket.getSeatNumber());
             ticketMap.put("createdAt", ticket.getCreatedAt());
+            
+            // Add cabin class from ticket (not from offer fares)
+            if (ticket.getCabinClass() != null) {
+                System.out.println("DEBUG: Ticket " + ticket.getId() + " Seat " + ticket.getSeatNumber() + 
+                                 " cabin_class_id in entity: " + ticket.getCabinClass().getId() + 
+                                 " cabin_class_name: " + ticket.getCabinClass().getName());
+                ticketMap.put("cabinClass", ticket.getCabinClass().getName());
+            } else {
+                System.out.println("DEBUG: Ticket " + ticket.getId() + " has NULL cabin class");
+                ticketMap.put("cabinClass", "ECONOMY"); // Default fallback
+            }
 
             // Add passenger info
             if (ticket.getPassenger() != null) {
