@@ -2,78 +2,91 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { NotificationsList } from '../components/NotificationsList';
+import { authAPI } from '../services/api';
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
 
-  // Mock notifications data - in real app this would come from API
-  const mockNotifications = [
-    {
-      id: 'notif-1',
-      type: 'ticket',
-      title: 'E-ticket issued',
-      message: 'Ticket TCK-10218 confirmed and issued. Check My Tickets.',
-      timestamp: '2025-08-28 12:18',
-      isRead: false,
-      isHighlighted: false,
-      actionUrl: '/tickets'
-    },
-    {
-      id: 'notif-2',
-      type: 'points',
-      title: 'Points credited',
-      message: '+1,250 points for flight FD-815 (completed).',
-      timestamp: '2025-08-29 09:00',
-      isRead: false,
-      isHighlighted: false,
-      actionUrl: '/loyalty'
-    },
-    {
-      id: 'notif-3',
-      type: 'offer',
-      title: 'Offer expires',
-      message: 'Search offer BEG → CDG will expire in 10 minutes.',
-      timestamp: '2025-09-05 10:03',
-      isRead: false,
-      isHighlighted: false,
-      actionUrl: '/search'
-    },
-    {
-      id: 'notif-4',
-      type: 'membership',
-      title: 'Membership update',
-      message: 'Congratulations! You reached Gold tier.',
-      timestamp: '2025-08-30 08:00',
-      isRead: false,
-      isHighlighted: true,
-      actionUrl: '/loyalty'
-    }
-  ];
-
   useEffect(() => {
-    // In real app, fetch notifications from API
     const fetchNotifications = async () => {
       setIsLoading(true);
       try {
-        // Simulate API call
-        // const response = await fetch('/api/user/notifications');
-        // const data = await response.json();
-        
-        // For now, use mock data
-        setTimeout(() => {
-          setNotifications(mockNotifications);
+        // Get user data from localStorage
+        const userData = localStorage.getItem('user');
+        if (!userData) {
+          console.error('No user data found');
           setIsLoading(false);
-        }, 500);
+          return;
+        }
+
+        const user = JSON.parse(userData);
+        const userId = user.id;
+
+        const response = await authAPI.getCustomerNotifications(userId);
+        const data = response.data;
+        
+        // Transform backend notifications to frontend format
+        const transformedNotifications = data.notifications.map(notif => ({
+          id: notif.id,
+          type: getNotificationType(notif.type),
+          title: getNotificationTitle(notif.type),
+          message: notif.message,
+          timestamp: formatTimestamp(notif.createdAt),
+          isRead: notif.isRead,
+          isHighlighted: false,
+          actionUrl: getActionUrl(notif.type)
+        }));
+        
+        setNotifications(transformedNotifications);
+        setUnreadCount(data.unreadCount);
       } catch (error) {
         console.error('Error fetching notifications:', error);
+      } finally {
         setIsLoading(false);
       }
     };
 
     fetchNotifications();
   }, []);
+
+  // Helper functions to transform notification data
+  const getNotificationType = (backendType) => {
+    switch (backendType) {
+      case 'FLIGHT_UPDATE': return 'flight';
+      case 'GENERAL': return 'points';
+      default: return 'general';
+    }
+  };
+
+  const getNotificationTitle = (backendType) => {
+    switch (backendType) {
+      case 'FLIGHT_UPDATE': return 'Flight Update';
+      case 'GENERAL': return 'Notification';
+      default: return 'Notification';
+    }
+  };
+
+  const getActionUrl = (backendType) => {
+    switch (backendType) {
+      case 'FLIGHT_UPDATE': return '/tickets';
+      case 'GENERAL': return '/loyalty';
+      default: return null;
+    }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   const handleNotificationClick = async (notification) => {
     try {
@@ -91,10 +104,18 @@ export default function Notifications() {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      // In real app, mark notification as read via API
-      // await fetch(`/api/notifications/${notificationId}/read`, {
-      //   method: 'PUT'
-      // });
+      // Get user data from localStorage
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        console.error('No user data found');
+        return;
+      }
+
+      const user = JSON.parse(userData);
+      const userId = user.id;
+
+      const response = await authAPI.markNotificationAsRead(userId, notificationId);
+      const data = response.data;
       
       // Update local state
       setNotifications(prev => 
@@ -105,6 +126,9 @@ export default function Notifications() {
         )
       );
       
+      // Update unread count
+      setUnreadCount(data.unreadCount);
+      
       console.log('Marked as read:', notificationId);
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -113,15 +137,26 @@ export default function Notifications() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      // In real app, mark all notifications as read via API
-      // await fetch('/api/notifications/mark-all-read', {
-      //   method: 'PUT'
-      // });
+      // Get user data from localStorage
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        console.error('No user data found');
+        return;
+      }
+
+      const user = JSON.parse(userData);
+      const userId = user.id;
+
+      const response = await authAPI.markAllNotificationsAsRead(userId);
+      const data = response.data;
       
       // Update local state
       setNotifications(prev => 
         prev.map(notif => ({ ...notif, isRead: true }))
       );
+      
+      // Set unread count to 0
+      setUnreadCount(0);
       
       console.log('All notifications marked as read');
     } catch (error) {
@@ -160,8 +195,6 @@ export default function Notifications() {
     fontFamily: 'Inter, sans-serif',
     transition: 'all 0.2s ease'
   };
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   if (isLoading) {
     return (

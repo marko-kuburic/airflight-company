@@ -2,55 +2,50 @@ import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { PointsCard } from '../components/PointsCard';
 import { MembershipTierCard } from '../components/MembershipTierCard';
-import { EarningHistoryTable } from '../components/EarningHistoryTable';
+import { authAPI } from '../services/api';
 
 export default function LoyaltyProgram() {
   const [loyaltyData, setLoyaltyData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Mock loyalty data - in real app this would come from API
-  const mockLoyaltyData = {
-    points: 18450,
-    tier: 'Gold',
-    earningHistory: [
-      {
-        date: '2025-08-28',
-        flight: 'FD-815 BEG → CDG',
-        status: 'Completed',
-        points: 1250
-      },
-      {
-        date: '2025-07-02',
-        flight: 'FD-702 BEG → FRA',
-        status: 'Completed',
-        points: 620
-      }
-    ],
-    // Additional data for tier calculations
-    tierThresholds: {
-      'Bronze': { min: 0, max: 10000 },
-      'Silver': { min: 10000, max: 25000 },
-      'Gold': { min: 25000, max: 50000 },
-      'Platinum': { min: 50000, max: 100000 }
-    }
-  };
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // In real app, fetch loyalty data from API
     const fetchLoyaltyData = async () => {
       setIsLoading(true);
+      setError(null);
+      
       try {
-        // Simulate API call
-        // const response = await fetch('/api/user/loyalty');
-        // const data = await response.json();
+        // Get user ID from localStorage or context
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          throw new Error('User not logged in');
+        }
         
-        // For now, use mock data
-        setTimeout(() => {
-          setLoyaltyData(mockLoyaltyData);
-          setIsLoading(false);
-        }, 500);
+        const user = JSON.parse(userStr);
+        const userId = user.id;
+        
+        // Fetch loyalty data from API
+        const response = await authAPI.getCustomerLoyalty(userId);
+        setLoyaltyData(response.data);
       } catch (error) {
         console.error('Error fetching loyalty data:', error);
+        setError('Failed to load loyalty program data');
+        
+        // Fallback to mock data if API fails
+        const mockLoyaltyData = {
+          points: 0,
+          tier: 'BRONZE',
+          earningHistory: [],
+          tierThresholds: {
+            'BRONZE': { min: 0, max: 10000 },
+            'SILVER': { min: 10000, max: 25000 },
+            'GOLD': { min: 25000, max: 50000 },
+            'PLATINUM': { min: 50000, max: 100000 },
+            'DIAMOND': { min: 100000, max: 999999 }
+          }
+        };
+        setLoyaltyData(mockLoyaltyData);
+      } finally {
         setIsLoading(false);
       }
     };
@@ -98,6 +93,27 @@ export default function LoyaltyProgram() {
     );
   }
 
+  if (error) {
+    return (
+      <Layout>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '400px',
+          fontSize: '16px',
+          color: '#dc2626'
+        }}>
+          <div style={{ marginBottom: '8px' }}>⚠️ {error}</div>
+          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+            Showing sample data instead
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div style={pageStyle}>
@@ -113,9 +129,7 @@ export default function LoyaltyProgram() {
           />
         </div>
         
-        <div style={historyContainerStyle}>
-          <EarningHistoryTable earningHistory={loyaltyData?.earningHistory} />
-        </div>
+        {/* Earning history removed - using real loyalty points from database */}
       </div>
     </Layout>
   );

@@ -1,48 +1,88 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { BookingConfirmation } from '../components/BookingConfirmation';
+import { generatePDFTicket, generateBoardingPass } from '../utils/pdfGenerator';
+import toast from 'react-hot-toast';
 
 export default function BookingConfirmed() {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get the booking data passed from the payment page
+  const navigationState = location.state || {};
+  const {
+    reservationNumber,
+    reservationData,
+    paymentData,
+    selectedFlight,
+    passengerData,
+    selectedSeat,
+    seatPrice,
+    totalPrice,
+    paymentMethod
+  } = navigationState;
 
-  // This data would come from the booking process/API response in a real app
-  // For now, using sample data that matches the design
+  // If no booking data is available, redirect to search
+  if (!selectedFlight || !passengerData) {
+    navigate('/search');
+    return null;
+  }
+
+  // Format flight details from actual booking data
   const bookingData = {
-    ticketNumber: 'TCK-10218',
+    ticketNumber: reservationNumber || `TCK-${Date.now().toString().slice(-6)}`,
     status: 'Confirmed / Paid',
     flightDetails: {
-      flightNumber: 'FD-801',
-      route: 'BEG → CDG',
-      departure: '08:10',
-      arrival: '10:35',
-      class: 'Economy'
+      flightNumber: selectedFlight.flightNumber || `${selectedFlight.airline || 'FD'}-${selectedFlight.flightId || '801'}`,
+      route: `${selectedFlight.departureAirport || selectedFlight.origin} → ${selectedFlight.arrivalAirport || selectedFlight.destination}`,
+      departure: selectedFlight.departureTime || '08:10',
+      arrival: selectedFlight.arrivalTime || '10:35',
+      class: selectedFlight.cabinClass || 'Economy'
     },
-    passengerName: 'Ana Petrović',
-    // Additional data that would come from backend
-    bookingReference: 'ABC123',
-    paymentAmount: '€142.00',
+    passengerName: `${passengerData.firstName} ${passengerData.lastName}`,
+    bookingReference: reservationData?.id ? `REF-${reservationData.id}` : `REF-${Date.now().toString().slice(-6)}`,
+    paymentAmount: `€${(totalPrice || selectedFlight.currentPrice || selectedFlight.price || 0).toFixed(2)}`,
     bookingDate: new Date().toISOString(),
-    email: 'ana.petrovic@email.com'
+    email: passengerData.email,
+    selectedSeat: selectedSeat,
+    seatPrice: seatPrice,
+    paymentMethod: paymentMethod || 'card'
   };
 
   const handleDownloadTicket = async () => {
     try {
-      // In a real app, this would call the backend API to generate PDF
-      // const response = await fetch(`/api/tickets/${bookingData.ticketNumber}/download`);
-      // const blob = await response.blob();
-      // const url = window.URL.createObjectURL(blob);
-      // const link = document.createElement('a');
-      // link.href = url;
-      // link.download = `ticket-${bookingData.ticketNumber}.pdf`;
-      // link.click();
-      
-      // For now, just show a mock action
       console.log('Downloading e-ticket for:', bookingData.ticketNumber);
-      alert('E-ticket download started! (This is a demo - no actual PDF will be downloaded)');
+      
+      // Use the new PDF generator
+      const success = generatePDFTicket(bookingData);
+      
+      if (success) {
+        toast.success('✈️ E-ticket downloaded successfully!');
+      } else {
+        throw new Error('PDF generation failed');
+      }
     } catch (error) {
       console.error('Error downloading ticket:', error);
-      alert('Error downloading ticket. Please try again.');
+      toast.error('❌ Error downloading ticket. Please try again.');
+    }
+  };
+
+  const handleDownloadBoardingPass = async () => {
+    try {
+      console.log('Downloading boarding pass for:', bookingData.ticketNumber);
+      
+      // Generate boarding pass
+      const success = generateBoardingPass(bookingData);
+      
+      if (success) {
+        toast.success('🎫 Boarding pass downloaded successfully!');
+      } else {
+        throw new Error('Boarding pass generation failed');
+      }
+    } catch (error) {
+      console.error('Error downloading boarding pass:', error);
+      toast.error('❌ Error downloading boarding pass. Please try again.');
     }
   };
 
@@ -58,7 +98,14 @@ export default function BookingConfirmed() {
         status={bookingData.status}
         flightDetails={bookingData.flightDetails}
         passengerName={bookingData.passengerName}
+        bookingReference={bookingData.bookingReference}
+        paymentAmount={bookingData.paymentAmount}
+        email={bookingData.email}
+        selectedSeat={bookingData.selectedSeat}
+        seatPrice={bookingData.seatPrice}
+        paymentMethod={bookingData.paymentMethod}
         onDownloadTicket={handleDownloadTicket}
+        onDownloadBoardingPass={handleDownloadBoardingPass}
         onGoToTickets={handleGoToTickets}
       />
     </Layout>

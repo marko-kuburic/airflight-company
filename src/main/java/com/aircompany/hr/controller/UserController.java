@@ -1,11 +1,7 @@
-package com.aircompany.sales.controller;
+package com.aircompany.hr.controller;
 
-import com.aircompany.hr.model.Customer;
-import com.aircompany.sales.dto.LoginRequest;
-import com.aircompany.sales.dto.RegisterRequest;
-import com.aircompany.sales.dto.UserProfileResponse;
-import com.aircompany.sales.service.UserService;
-import com.aircompany.sales.model.Loyalty;
+import com.aircompany.sales.dto.*;
+import com.aircompany.hr.service.UserService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,11 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import com.aircompany.sales.model.Reservation;
 
 @RestController
 @RequestMapping("/api/users")
@@ -79,69 +72,6 @@ public class UserController {
         } catch (Exception e) {
             logger.error("Registration failed for email {}: {}", registerRequest.getEmail(), e.getMessage());
             return ResponseEntity.badRequest().body(createErrorResponse("Registration failed: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Get user profile
-     */
-    @GetMapping("/profile/{userId}")
-    public ResponseEntity<?> getUserProfile(@PathVariable Long userId) {
-        try {
-            Optional<UserProfileResponse> profileOptional = userService.getUserProfile(userId);
-            if (profileOptional.isPresent()) {
-                return ResponseEntity.ok(profileOptional.get());
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            logger.error("Error getting user profile for ID {}: {}", userId, e.getMessage());
-            return ResponseEntity.badRequest().body(createErrorResponse("User not found"));
-        }
-    }
-    
-    /**
-     * Update user profile
-     */
-    @PutMapping("/profile/{userId}")
-    public ResponseEntity<?> updateUserProfile(@PathVariable Long userId, 
-                                             @Valid @RequestBody RegisterRequest updateRequest) {
-        try {
-            // TODO: Implement profile update functionality
-            return ResponseEntity.ok(Map.of("message", "Profile update functionality coming soon"));
-        } catch (Exception e) {
-            logger.error("Error updating user profile for ID {}: {}", userId, e.getMessage());
-            return ResponseEntity.badRequest().body(createErrorResponse("Failed to update profile: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Get user's loyalty information
-     */
-    @GetMapping("/{userId}/loyalty")
-    public ResponseEntity<?> getUserLoyalty(@PathVariable Long userId) {
-        try {
-            // TODO: Implement loyalty functionality  
-            return ResponseEntity.ok(Map.of("tier", "BRONZE", "points", 0));
-        } catch (Exception e) {
-            logger.error("Error getting loyalty info for user {}: {}", userId, e.getMessage());
-            return ResponseEntity.badRequest().body(createErrorResponse("Loyalty information not found"));
-        }
-    }
-    
-    /**
-     * Get user's reservation history
-     */
-    @GetMapping("/{userId}/reservations")
-    public ResponseEntity<?> getUserReservations(@PathVariable Long userId,
-                                                @RequestParam(defaultValue = "0") int page,
-                                                @RequestParam(defaultValue = "10") int size) {
-        try {
-            List<Reservation> reservations = userService.getUserReservations(userId);
-            return ResponseEntity.ok(Map.of("reservations", reservations, "totalElements", reservations.size()));
-        } catch (Exception e) {
-            logger.error("Error getting reservations for user {}: {}", userId, e.getMessage());
-            return ResponseEntity.badRequest().body(createErrorResponse("Failed to get reservations"));
         }
     }
     

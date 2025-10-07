@@ -5,7 +5,6 @@ import com.aircompany.sales.model.Offer;
 import com.aircompany.sales.model.Reservation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.persistence.EntityManager;
@@ -15,8 +14,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.DayOfWeek;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Service for dynamic pricing based on demand, season, and class
@@ -54,8 +53,33 @@ public class DynamicPricingService {
         // Base price calculation - simplified version
         // In real implementation, this would come from fare tables based on route distance, aircraft type, etc.
         
-        if (flight.getOffer() != null && flight.getOffer().getBasePrice() != null) {
-            return flight.getOffer().getBasePrice();
+        if (flight.getOffers() != null && !flight.getOffers().isEmpty()) {
+            // Return the base price of the first offer (typically economy)
+            return flight.getOffers().get(0).getBasePrice();
+        }
+        
+        // Fallback: calculate based on route distance (simplified)
+        BigDecimal basePrice = new BigDecimal("100"); // Base fare
+        
+        if (flight.getRoute() != null && flight.getRoute().getTotalDistance() != null) {
+            // Add distance-based pricing: 0.10 per km
+            BigDecimal distancePrice = flight.getRoute().getTotalDistance().multiply(new BigDecimal("0.10"));
+            basePrice = basePrice.add(distancePrice);
+        }
+        
+        return basePrice.setScale(2, RoundingMode.HALF_UP);
+    }
+    
+    /**
+     * Get base price for a flight with pre-fetched offers to avoid lazy loading
+     */
+    public BigDecimal getBasePrice(Flight flight, List<Offer> offers) {
+        // Base price calculation - simplified version
+        // In real implementation, this would come from fare tables based on route distance, aircraft type, etc.
+        
+        if (offers != null && !offers.isEmpty()) {
+            // Return the base price of the first offer (typically economy)
+            return offers.get(0).getBasePrice();
         }
         
         // Fallback: calculate based on route distance (simplified)
@@ -75,6 +99,45 @@ public class DynamicPricingService {
      */
     public BigDecimal getCurrentPrice(Flight flight) {
         BigDecimal basePrice = getBasePrice(flight);
+        
+        // Apply demand-based multiplier
+        BigDecimal demandMultiplier = calculateDemandMultiplier(flight);
+        
+        // Apply seasonal multiplier
+        BigDecimal seasonalMultiplier = calculateSeasonalMultiplier(flight.getDepTime());
+        
+        // Apply weekend multiplier
+        BigDecimal weekendMultiplier = calculateWeekendMultiplier(flight.getDepTime());
+        
+        // Apply time-based multiplier (early booking vs last minute)
+        BigDecimal timeMultiplier = calculateTimeBasedMultiplier(flight.getDepTime());
+        
+        // Apply time-of-day multiplier (early morning/late night cheaper)
+        BigDecimal timeOfDayMultiplier = calculateTimeOfDayMultiplier(flight.getDepTime());
+        
+        // Apply micro-fluctuation (±$0.50 - $2.00 per refresh to simulate real-time changes)
+        BigDecimal microFluctuation = calculateMicroFluctuation(flight.getId());
+        
+        // Calculate final price
+        BigDecimal finalPrice = basePrice
+            .multiply(demandMultiplier)
+            .multiply(seasonalMultiplier)
+            .multiply(weekendMultiplier)
+            .multiply(timeMultiplier)
+            .multiply(timeOfDayMultiplier)
+            .add(microFluctuation);
+        
+        logger.debug("Dynamic pricing for flight {}: base={}, demand={}, season={}, weekend={}, time={}, timeOfDay={}, fluctuation={}, final={}", 
+            flight.getId(), basePrice, demandMultiplier, seasonalMultiplier, weekendMultiplier, timeMultiplier, timeOfDayMultiplier, microFluctuation, finalPrice);
+        
+        return finalPrice.setScale(2, RoundingMode.HALF_UP);
+    }
+    
+    /**
+     * Calculate current dynamic price based on all factors with pre-fetched offers
+     */
+    public BigDecimal getCurrentPrice(Flight flight, List<Offer> offers) {
+        BigDecimal basePrice = getBasePrice(flight, offers);
         
         // Apply demand-based multiplier
         BigDecimal demandMultiplier = calculateDemandMultiplier(flight);
@@ -174,6 +237,50 @@ public class DynamicPricingService {
         }
         
         return BigDecimal.ONE; // Standard pricing for normal booking window
+    }
+    
+    /**
+     * Calculate time-of-day multiplier
+     * Early morning (00:00-06:00) and late night (22:00-23:59): 10% cheaper
+     * Peak hours (07:00-09:00, 17:00-20:00): 5% more expensive
+     * Normal hours: standard pricing
+     */
+    private BigDecimal calculateTimeOfDayMultiplier(LocalDateTime departureTime) {
+        int hour = departureTime.getHour();
+        
+        if (hour >= 0 && hour < 6 || hour >= 22) {
+            // Red-eye flights: cheaper
+            return new BigDecimal("0.90"); // 10% discount
+        } else if ((hour >= 7 && hour < 10) || (hour >= 17 && hour < 21)) {
+            // Peak business hours: more expensive
+            return new BigDecimal("1.05"); // 5% premium
+        }
+        
+        // Normal hours
+        return BigDecimal.ONE;
+    }
+    
+    /**
+     * Calculate micro-fluctuation to simulate real-time price changes
+     * Adds small random variations (±$0.50 to ±$2.00) based on:
+     * - Current timestamp (changes every refresh)
+     * - Flight ID (consistent per flight but different across flights)
+     * - Market volatility simulation
+     */
+    private BigDecimal calculateMicroFluctuation(Long flightId) {
+        // Use current time in seconds to create fluctuation that changes over time
+        long currentTimeSeconds = System.currentTimeMillis() / 1000;
+        
+        // Create a pseudo-random seed that changes every ~30 seconds
+        // This ensures prices fluctuate but not TOO rapidly
+        long seed = (currentTimeSeconds / 30) + flightId;
+        java.util.Random random = new java.util.Random(seed);
+        
+        // Generate fluctuation between -2.00 and +2.00
+        double fluctuationRange = 4.0; // Total range: $4 (from -2 to +2)
+        double fluctuation = (random.nextDouble() * fluctuationRange) - 2.0;
+        
+        return BigDecimal.valueOf(fluctuation).setScale(2, RoundingMode.HALF_UP);
     }
     
     /**

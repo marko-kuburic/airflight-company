@@ -1,21 +1,10 @@
 package com.aircompany.flight.service;
 
-import com.aircompany.flight.dto.FlightRequestDto;
-import com.aircompany.flight.dto.FlightResponseDto;
-import com.aircompany.flight.model.Aircraft;
 import com.aircompany.flight.model.Flight;
-import com.aircompany.flight.model.Flight.FlightStatus;
-import com.aircompany.flight.model.Route;
-import com.aircompany.flight.repository.AircraftRepository;
-import com.aircompany.flight.repository.FlightRepository;
-import com.aircompany.flight.repository.RouteRepository;
-import com.aircompany.hr.model.FlightDispatcher;
-import com.aircompany.hr.repository.FlightDispatcherRepository;
+import com.aircompany.flight.model.Aircraft;
 import com.aircompany.sales.dto.FlightSearchRequest;
 import com.aircompany.sales.dto.FlightSearchResponse;
 import com.aircompany.sales.model.Offer;
-import com.aircompany.sales.model.Ticket;
-import com.aircompany.sales.repository.TicketRepository;
 import com.aircompany.sales.service.OfferService;
 import com.aircompany.sales.service.DynamicPricingService;
 import org.slf4j.Logger;
@@ -25,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import java.math.BigDecimal;
@@ -35,7 +25,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
 public class FlightService {
     
     private static final Logger logger = LoggerFactory.getLogger(FlightService.class);
@@ -44,306 +33,169 @@ public class FlightService {
     private EntityManager entityManager;
     
     @Autowired
-    private FlightRepository flightRepository;
-    
-    @Autowired
-    private AircraftRepository aircraftRepository;
-    
-    @Autowired
-    private RouteRepository routeRepository;
-    
-    @Autowired
-    private FlightDispatcherRepository flightDispatcherRepository;
-    
-    @Autowired
-    private TicketRepository ticketRepository;
-    
-    @Autowired
     private OfferService offerService;
     
     @Autowired
     private DynamicPricingService dynamicPricingService;
     
-    // ========== FLIGHT MANAGEMENT METHODS ==========
-    
-    public List<FlightResponseDto> getAllFlights() {
-        return flightRepository.findAll().stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-    
-    public Optional<FlightResponseDto> getFlightById(Long id) {
-        return flightRepository.findById(id)
-                .map(this::convertToResponseDto);
-    }
-    
-    public List<FlightResponseDto> getFlightsByStatus(FlightStatus status) {
-        return flightRepository.findByStatus(status).stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-    
-    public List<FlightResponseDto> getFlightsByDateRange(LocalDateTime startTime, LocalDateTime endTime) {
-        return flightRepository.findByDepTimeBetween(startTime, endTime).stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-    
-    public List<FlightResponseDto> getFlightsByAircraft(Long aircraftId) {
-        return flightRepository.findByAircraftId(aircraftId).stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-    
-    public List<FlightResponseDto> getFlightsByRoute(Long routeId) {
-        return flightRepository.findByRouteId(routeId).stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-    
-    public List<FlightResponseDto> getFlightsByDispatcher(Long flightDispatcherId) {
-        return flightRepository.findByFlightDispatcherId(flightDispatcherId).stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-    
-    public FlightResponseDto createFlight(FlightRequestDto requestDto) {
-        Aircraft aircraft = null;
-        if (requestDto.getAircraftId() != null) {
-            aircraft = aircraftRepository.findById(requestDto.getAircraftId())
-                    .orElseThrow(() -> new IllegalArgumentException("Aircraft with ID " + requestDto.getAircraftId() + " not found"));
-        }
-        
-        Route route = null;
-        if (requestDto.getRouteId() != null) {
-            route = routeRepository.findById(requestDto.getRouteId())
-                    .orElseThrow(() -> new IllegalArgumentException("Route with ID " + requestDto.getRouteId() + " not found"));
-        }
-        
-        FlightDispatcher flightDispatcher = null;
-        if (requestDto.getFlightDispatcherId() != null) {
-            flightDispatcher = flightDispatcherRepository.findById(requestDto.getFlightDispatcherId())
-                    .orElseThrow(() -> new IllegalArgumentException("FlightDispatcher with ID " + requestDto.getFlightDispatcherId() + " not found"));
-        }
-        
-        Flight flight = new Flight(requestDto.getDepTime(), requestDto.getArrTime(), requestDto.getStatus());
-        flight.setAircraft(aircraft);
-        flight.setRoute(route);
-        flight.setFlightDispatcher(flightDispatcher);
-        
-        Flight savedFlight = flightRepository.save(flight);
-        return convertToResponseDto(savedFlight);
-    }
-    
-    public Optional<FlightResponseDto> updateFlight(Long id, FlightRequestDto requestDto) {
-        return flightRepository.findById(id)
-                .map(flight -> {
-                    flight.setDepTime(requestDto.getDepTime());
-                    flight.setArrTime(requestDto.getArrTime());
-                    flight.setStatus(requestDto.getStatus());
-                    
-                    if (requestDto.getAircraftId() != null) {
-                        Aircraft aircraft = aircraftRepository.findById(requestDto.getAircraftId())
-                                .orElseThrow(() -> new IllegalArgumentException("Aircraft with ID " + requestDto.getAircraftId() + " not found"));
-                        flight.setAircraft(aircraft);
-                    }
-                    
-                    if (requestDto.getRouteId() != null) {
-                        Route route = routeRepository.findById(requestDto.getRouteId())
-                                .orElseThrow(() -> new IllegalArgumentException("Route with ID " + requestDto.getRouteId() + " not found"));
-                        flight.setRoute(route);
-                    }
-                    
-                    if (requestDto.getFlightDispatcherId() != null) {
-                        FlightDispatcher flightDispatcher = flightDispatcherRepository.findById(requestDto.getFlightDispatcherId())
-                                .orElseThrow(() -> new IllegalArgumentException("FlightDispatcher with ID " + requestDto.getFlightDispatcherId() + " not found"));
-                        flight.setFlightDispatcher(flightDispatcher);
-                    }
-                    
-                    Flight savedFlight = flightRepository.save(flight);
-                    return convertToResponseDto(savedFlight);
-                });
-    }
-    
-    public Optional<FlightResponseDto> updateFlightStatus(Long id, FlightStatus status) {
-        return flightRepository.findById(id)
-                .map(flight -> {
-                    flight.setStatus(status);
-                    Flight savedFlight = flightRepository.save(flight);
-                    return convertToResponseDto(savedFlight);
-                });
-    }
-    
-    public boolean deleteFlight(Long id) {
-        if (flightRepository.existsById(id)) {
-            flightRepository.deleteById(id);
-            return true;
-        }
-        return false;
-    }
-    
-    public Long getFlightCountByStatus(FlightStatus status) {
-        return flightRepository.countByStatus(status);
-    }
-    
-    // ========== SALES METHODS ==========
-    
     /**
      * Search for flights based on search criteria
+     * Supports "Anywhere" searches where origin and/or destination can be empty
      */
+    @Transactional
     public List<FlightSearchResponse> searchFlights(FlightSearchRequest searchRequest) {
-        logger.info("Searching flights from {} to {} on {}", 
+        logger.info("Searching flights from '{}' to '{}' on {}", 
             searchRequest.getOrigin(), searchRequest.getDestination(), searchRequest.getDepartureDate());
+        
+        // Check for "Anywhere" searches
+        boolean hasOrigin = searchRequest.getOrigin() != null && !searchRequest.getOrigin().trim().isEmpty();
+        boolean hasDestination = searchRequest.getDestination() != null && !searchRequest.getDestination().trim().isEmpty();
+        
+        logger.info("Search type: hasOrigin={}, hasDestination={}", hasOrigin, hasDestination);
         
         // Build dynamic query based on search criteria
         StringBuilder jpql = new StringBuilder(
-            "SELECT f FROM Flight f " +
-            "JOIN f.route r " +
-            "JOIN r.segments s " +
-            "JOIN s.originAirport origin " +
-            "JOIN s.destinationAirport dest " +
-            "WHERE DATE(f.depTime) = :departureDate " +
+            "SELECT DISTINCT f FROM Flight f " +
+            "JOIN FETCH f.route r " +
+            "JOIN FETCH r.segments s " +
+            "JOIN FETCH s.originAirport origin " +
+            "JOIN FETCH s.destinationAirport dest " +
+            "JOIN FETCH f.aircraft " +
+            "WHERE f.depTime >= :startOfDay AND f.depTime < :endOfDay " +
             "AND f.status = :status "
         );
         
-        // Add origin/destination filters if provided
-        if (searchRequest.getOrigin() != null && !searchRequest.getOrigin().trim().isEmpty()) {
-            jpql.append("AND (origin.code = :origin OR origin.name LIKE :originName) ");
+        // Add origin/destination filters if provided and not empty
+        if (hasOrigin) {
+            jpql.append("AND (origin.iataCode = :origin OR origin.name LIKE :originName) ");
         }
         
-        if (searchRequest.getDestination() != null && !searchRequest.getDestination().trim().isEmpty()) {
-            jpql.append("AND (dest.code = :destination OR dest.name LIKE :destinationName) ");
+        if (hasDestination) {
+            jpql.append("AND (dest.iataCode = :destination OR dest.name LIKE :destinationName) ");
         }
         
         jpql.append("ORDER BY f.depTime ASC");
         
         TypedQuery<Flight> query = entityManager.createQuery(jpql.toString(), Flight.class);
-        query.setParameter("departureDate", searchRequest.getDepartureDate());
+        
+        // Set date range parameters
+        LocalDateTime startOfDay = searchRequest.getDepartureDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+        query.setParameter("startOfDay", startOfDay);
+        query.setParameter("endOfDay", endOfDay);
         query.setParameter("status", Flight.FlightStatus.SCHEDULED);
         
-        if (searchRequest.getOrigin() != null && !searchRequest.getOrigin().trim().isEmpty()) {
+        if (hasOrigin) {
             query.setParameter("origin", searchRequest.getOrigin().toUpperCase());
             query.setParameter("originName", "%" + searchRequest.getOrigin() + "%");
         }
         
-        if (searchRequest.getDestination() != null && !searchRequest.getDestination().trim().isEmpty()) {
+        if (hasDestination) {
             query.setParameter("destination", searchRequest.getDestination().toUpperCase());
             query.setParameter("destinationName", "%" + searchRequest.getDestination() + "%");
         }
         
+        // Limit results for "Anywhere" searches to avoid overwhelming the UI
+        if (!hasOrigin && !hasDestination) {
+            // Both are "Anywhere" - limit to 50 flights
+            query.setMaxResults(50);
+            logger.info("Anywhere to Anywhere search - limiting to 50 results");
+        } else if (!hasOrigin || !hasDestination) {
+            // One is "Anywhere" - limit to 100 flights
+            query.setMaxResults(100);
+            logger.info("Partial Anywhere search - limiting to 100 results");
+        }
+        
         List<Flight> flights = query.getResultList();
+        logger.info("Found {} flights for search criteria", flights.size());
         
         // Convert to response DTOs with dynamic pricing
         return flights.stream()
-            .map(this::convertToFlightSearchResponse)
+            .map(this::convertToFlightResponse)
             .collect(Collectors.toList());
     }
     
     /**
-     * Get flight entity by ID (for sales operations)
+     * Get flight by ID
      */
-    public Flight getFlightEntityById(Long id) {
+    public Flight getFlightById(Long id) {
         return entityManager.find(Flight.class, id);
     }
     
     /**
-     * Get occupied seats for a flight
+     * Get all flights (for debugging purposes)
      */
-    public List<String> getOccupiedSeats(Long flightId) {
-        TypedQuery<String> query = entityManager.createQuery(
-            "SELECT t.seatNumber FROM Ticket t " +
-            "JOIN t.reservation r " +
-            "JOIN r.offer o " +
-            "JOIN o.flight f " +
-            "WHERE f.id = :flightId " +
-            "AND t.seatNumber IS NOT NULL " +
-            "AND t.status IN ('CONFIRMED', 'USED') " +
-            "AND r.status != 'CANCELLED'",
-            String.class
-        );
-        query.setParameter("flightId", flightId);
-        
+    @Transactional(readOnly = true)
+    public List<Flight> getAllFlights() {
+        String jpql = "SELECT f FROM Flight f ORDER BY f.depTime ASC";
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setMaxResults(100); // Limit to avoid too much data
         return query.getResultList();
     }
     
     /**
-     * Check if a seat is available
+     * Get flight response DTO by ID with current pricing
      */
-    public boolean isSeatAvailable(Long flightId, String seatNumber) {
-        List<String> occupiedSeats = getOccupiedSeats(flightId);
-        return !occupiedSeats.contains(seatNumber);
+    @Transactional(readOnly = true)
+    public FlightSearchResponse getFlightResponseById(Long id) {
+        // Use JOIN FETCH to avoid lazy loading issues
+        String jpql = "SELECT DISTINCT f FROM Flight f " +
+                     "JOIN FETCH f.route r " +
+                     "JOIN FETCH r.segments s " +
+                     "JOIN FETCH s.originAirport " +
+                     "JOIN FETCH s.destinationAirport " +
+                     "JOIN FETCH f.aircraft " +
+                     "WHERE f.id = :flightId";
+        
+        TypedQuery<Flight> query = entityManager.createQuery(jpql, Flight.class);
+        query.setParameter("flightId", id);
+        
+        try {
+            Flight flight = query.getSingleResult();
+            return convertToFlightResponse(flight);
+        } catch (NoResultException e) {
+            throw new RuntimeException("Flight not found with ID: " + id);
+        }
     }
     
     /**
      * Get seat map configuration for a flight
      */
     public Map<String, Object> getSeatMap(Long flightId) {
-        Flight flight = getFlightEntityById(flightId);
+        Flight flight = getFlightById(flightId);
         if (flight == null) {
             throw new RuntimeException("Flight not found");
         }
         
         Aircraft aircraft = flight.getAircraft();
-        List<String> occupiedSeats = getOccupiedSeats(flightId);
         
         // Generate seat map based on aircraft capacity
         Map<String, Object> seatMap = new HashMap<>();
         seatMap.put("aircraftModel", aircraft.getModel());
         seatMap.put("totalCapacity", aircraft.getCapacity());
-        seatMap.put("occupiedSeats", occupiedSeats);
-        seatMap.put("availableSeats", aircraft.getCapacity() - occupiedSeats.size());
         
         // Generate available seat numbers (simplified)
         List<String> allSeats = generateSeatNumbers(aircraft.getCapacity());
-        List<String> availableSeats = allSeats.stream()
-            .filter(seat -> !occupiedSeats.contains(seat))
-            .collect(Collectors.toList());
         
-        seatMap.put("availableSeatNumbers", availableSeats);
+        seatMap.put("availableSeatNumbers", allSeats);
         seatMap.put("seatConfiguration", generateSeatConfiguration(aircraft.getCapacity()));
         
         return seatMap;
     }
     
-    // ========== PRIVATE HELPER METHODS ==========
-    
-    private FlightResponseDto convertToResponseDto(Flight flight) {
-        FlightResponseDto responseDto = new FlightResponseDto();
-        responseDto.setId(flight.getId());
-        responseDto.setDepTime(flight.getDepTime());
-        responseDto.setArrTime(flight.getArrTime());
-        responseDto.setStatus(flight.getStatus());
-        responseDto.setCreatedAt(flight.getCreatedAt());
-        responseDto.setModifiedAt(flight.getModifiedAt());
-        
-        if (flight.getAircraft() != null) {
-            responseDto.setAircraftId(flight.getAircraft().getId());
-            responseDto.setAircraftModel(flight.getAircraft().getModel());
-        }
-        
-        if (flight.getRoute() != null) {
-            responseDto.setRouteId(flight.getRoute().getId());
-            responseDto.setRouteName(flight.getRoute().getName());
-        }
-        
-        if (flight.getFlightDispatcher() != null) {
-            responseDto.setFlightDispatcherId(flight.getFlightDispatcher().getId());
-            responseDto.setFlightDispatcherName(
-                    flight.getFlightDispatcher().getFirstName() + " " + 
-                    flight.getFlightDispatcher().getLastName()
-            );
-        }
-        
-        responseDto.setScheduleCount(flight.getSchedules().size());
-        
-        return responseDto;
-    }
-    
     /**
      * Convert Flight entity to FlightSearchResponse DTO
      */
-    private FlightSearchResponse convertToFlightSearchResponse(Flight flight) {
+    private FlightSearchResponse convertToFlightResponse(Flight flight) {
+        // Get active AND NON-EXPIRED offers for this flight
         List<Offer> offers = offerService.getActiveOffersForFlight(flight.getId());
+        
+        // If no active offers exist or all are expired, regenerate
+        if (offers.isEmpty()) {
+            logger.info("No active offers found for flight {}. Regenerating offer.", flight.getFlightNumber());
+            Offer newOffer = offerService.regenerateOfferForFlight(flight.getId());
+            offers = List.of(newOffer);
+        }
         
         FlightSearchResponse response = new FlightSearchResponse(flight, offers);
         
@@ -354,12 +206,11 @@ public class FlightService {
         response.setDuration(calculateDuration(flight.getDepTime(), flight.getArrTime()));
         
         // Get dynamic pricing
-        response.setBasePrice(dynamicPricingService.getBasePrice(flight));
-        response.setCurrentPrice(dynamicPricingService.getCurrentPrice(flight));
+        response.setBasePrice(dynamicPricingService.getBasePrice(flight, offers));
+        response.setCurrentPrice(dynamicPricingService.getCurrentPrice(flight, offers));
         
-        // Get available seats
-        List<String> occupiedSeats = getOccupiedSeats(flight.getId());
-        response.setAvailableSeats(flight.getAircraft().getCapacity() - occupiedSeats.size());
+        // Set available seats (simplified - using total capacity)
+        response.setAvailableSeats(flight.getAircraft().getCapacity());
         
         // Set offers information
         if (!offers.isEmpty()) {
@@ -417,6 +268,103 @@ public class FlightService {
         }
         
         return seats;
+    }
+    
+    /**
+     * Get all airports for dropdown search
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, String>> getAllAirports() {
+        String query = """
+            SELECT a.iata_code, a.name, a.city, c.name as country_name
+            FROM airports a 
+            LEFT JOIN countries c ON a.country_code = c.code 
+            ORDER BY a.name
+        """;
+        
+        List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
+        
+        return results.stream()
+            .map(row -> {
+                Map<String, String> airportData = new HashMap<>();
+                airportData.put("code", (String) row[0]);
+                airportData.put("name", (String) row[1]);
+                airportData.put("city", (String) row[2]);
+                airportData.put("country", (String) row[3]);
+                airportData.put("label", row[2] + " (" + row[0] + ")");
+                return airportData;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get all destinations from a specific origin airport
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, String>> getDestinationsFromOrigin(String originCode) {
+        String query = """
+            SELECT DISTINCT dest.iata_code, dest.name, dest.city, c.name as country_name
+            FROM flights f
+            JOIN routes r ON f.route_id = r.id
+            JOIN segments s ON r.id = s.route_id
+            JOIN airports origin ON s.origin_airport_id = origin.id
+            JOIN airports dest ON s.destination_airport_id = dest.id
+            LEFT JOIN countries c ON dest.country_code = c.code
+            WHERE origin.iata_code = :originCode
+            AND f.status = 'SCHEDULED'
+            ORDER BY dest.city
+        """;
+        
+        List<Object[]> results = entityManager.createNativeQuery(query)
+            .setParameter("originCode", originCode.toUpperCase())
+            .getResultList();
+        
+        return results.stream()
+            .map(row -> {
+                Map<String, String> airportData = new HashMap<>();
+                airportData.put("code", (String) row[0]);
+                airportData.put("name", (String) row[1]);
+                airportData.put("city", (String) row[2]);
+                airportData.put("country", (String) row[3]);
+                airportData.put("label", row[2] + " (" + row[0] + ")");
+                return airportData;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get all origins to a specific destination airport
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, String>> getOriginsToDestination(String destinationCode) {
+        String query = """
+            SELECT DISTINCT origin.iata_code, origin.name, origin.city, c.name as country_name
+            FROM flights f
+            JOIN routes r ON f.route_id = r.id
+            JOIN segments s ON r.id = s.route_id
+            JOIN airports origin ON s.origin_airport_id = origin.id
+            JOIN airports dest ON s.destination_airport_id = dest.id
+            LEFT JOIN countries c ON origin.country_code = c.code
+            WHERE dest.iata_code = :destinationCode
+            AND f.status = 'SCHEDULED'
+            ORDER BY origin.city
+        """;
+        
+        List<Object[]> results = entityManager.createNativeQuery(query)
+            .setParameter("destinationCode", destinationCode.toUpperCase())
+            .getResultList();
+        
+        return results.stream()
+            .map(row -> {
+                Map<String, String> airportData = new HashMap<>();
+                airportData.put("code", (String) row[0]);
+                airportData.put("name", (String) row[1]);
+                airportData.put("city", (String) row[2]);
+                airportData.put("country", (String) row[3]);
+                airportData.put("label", row[2] + " (" + row[0] + ")");
+                return airportData;
+            })
+            .collect(Collectors.toList());
     }
     
     /**

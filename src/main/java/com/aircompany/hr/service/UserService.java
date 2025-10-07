@@ -1,18 +1,14 @@
-package com.aircompany.sales.service;
+package com.aircompany.hr.service;
 
 import com.aircompany.hr.model.Customer;
-import com.aircompany.sales.dto.LoginRequest;
-import com.aircompany.sales.dto.RegisterRequest;
-import com.aircompany.sales.dto.UserProfileResponse;
+import com.aircompany.sales.dto.*;
 import com.aircompany.sales.model.Loyalty;
-import com.aircompany.sales.model.Reservation;
 import com.aircompany.sales.repository.CustomerRepository;
 import com.aircompany.sales.repository.LoyaltyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -76,6 +72,8 @@ public class UserService {
         profile.setLastName(customer.getLastName());
         profile.setEmail(customer.getEmail());
         profile.setPhone(customer.getPhone());
+        profile.setDateOfBirth(customer.getDateOfBirth());
+        profile.setPreferredLanguage(customer.getPreferredLanguage());
         
         // Get loyalty info
         Optional<Loyalty> loyaltyOpt = loyaltyRepository.findByCustomer(customer);
@@ -93,25 +91,5 @@ public class UserService {
         }
         
         return profile;
-    }
-    
-    public Optional<UserProfileResponse> getUserProfile(Long userId) {
-        UserProfileResponse profile = new UserProfileResponse();
-        profile.setId(userId);
-        profile.setFirstName("Demo");
-        profile.setLastName("User");
-        profile.setEmail("demo@aircompany.com");
-        profile.setPhone("+1234567890");
-        
-        UserProfileResponse.LoyaltyInfo loyaltyInfo = new UserProfileResponse.LoyaltyInfo();
-        loyaltyInfo.setTier("BRONZE");
-        loyaltyInfo.setPoints(0);
-        profile.setLoyalty(loyaltyInfo);
-        
-        return Optional.of(profile);
-    }
-    
-    public List<Reservation> getUserReservations(Long userId) {
-        return List.of();
     }
 }

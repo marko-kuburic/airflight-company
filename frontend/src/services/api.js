@@ -3,20 +3,32 @@ import toast from 'react-hot-toast';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor for adding auth token
+// Request interceptor for adding auth token and cache-busting
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add cache-busting headers
+    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    config.headers['Pragma'] = 'no-cache';
+    config.headers['Expires'] = '0';
+    
+    // Add timestamp to prevent caching
+    if (config.method === 'get') {
+      config.params = config.params || {};
+      config.params._t = Date.now();
+    }
+    
     return config;
   },
   (error) => {
@@ -48,15 +60,35 @@ api.interceptors.response.use(
 
 // API endpoints
 export const authAPI = {
-  // Authentication
+  // Authentication - HR domain
   login: (credentials) => api.post('/users/login', credentials),
   register: (userData) => api.post('/users/register', userData),
+  logout: () => api.post('/users/logout'),
+  changePassword: (userId, passwordData) => api.post(`/users/${userId}/change-password`, passwordData),
   
-  // User management
-  getUserProfile: (userId) => api.get(`/users/profile/${userId}`),
-  updateUserProfile: (userId, data) => api.put(`/users/profile/${userId}`, data),
-  getUserReservations: (userId) => api.get(`/users/${userId}/reservations`),
-  getUserLoyalty: (userId) => api.get(`/users/${userId}/loyalty`),
+  // Customer management - Sales domain
+  getCustomerProfile: (customerId) => api.get(`/customers/profile/${customerId}`),
+  updateCustomerProfile: (customerId, data) => api.put(`/customers/profile/${customerId}`, data),
+  getCustomerReservations: (customerId) => api.get(`/customers/${customerId}/reservations`),
+  getCustomerLoyalty: (customerId) => api.get(`/customers/${customerId}/loyalty`),
+  
+  // Notifications
+  getCustomerNotifications: (customerId) => api.get(`/customers/${customerId}/notifications`),
+  markNotificationAsRead: (customerId, notificationId) => api.put(`/customers/${customerId}/notifications/${notificationId}/read`),
+  markAllNotificationsAsRead: (customerId) => api.put(`/customers/${customerId}/notifications/read-all`),
+  
+  // Payment methods
+  getCustomerPaymentMethods: (customerId) => api.get(`/customers/${customerId}/payment-methods`),
+  savePaymentMethod: (customerId, data) => api.post(`/customers/${customerId}/payment-methods`, data),
+  deletePaymentMethod: (customerId, paymentMethodId) => api.delete(`/customers/${customerId}/payment-methods/${paymentMethodId}`),
+  
+  // Legacy aliases for backward compatibility (temporary)
+  getUserProfile: (userId) => api.get(`/customers/profile/${userId}`),
+  updateUserProfile: (userId, data) => api.put(`/customers/profile/${userId}`, data),
+  getUserReservations: (userId) => api.get(`/customers/${userId}/reservations`),
+  getUserLoyalty: (userId) => api.get(`/customers/${userId}/loyalty`),
+  getUserNotifications: (userId) => api.get(`/customers/${userId}/notifications`),
+  getUserPaymentMethods: (userId) => api.get(`/customers/${userId}/payment-methods`),
 };
 
 export const flightAPI = {
@@ -64,11 +96,19 @@ export const flightAPI = {
   searchFlights: (params) => api.get('/flights/search', { params }),
   getFlightById: (id) => api.get(`/flights/${id}`),
   
+  // Airports
+  getAirports: () => api.get('/flights/airports'),
+  getDestinationsFromOrigin: (origin) => api.get('/flights/destinations', { params: { origin } }),
+  getOriginsToDestination: (destination) => api.get('/flights/origins', { params: { destination } }),
+  
   // Offers
   getOffers: () => api.get('/offers'),
   getOfferById: (id) => api.get(`/offers/${id}`),
   getOffersByFlight: (flightId) => api.get(`/offers/flight/${flightId}`),
   checkOfferValidity: (id) => api.get(`/offers/${id}/validity`),
+  
+  // Refresh expired offers with new pricing
+  refreshOffer: (flightId) => api.post(`/flights/${flightId}/refresh-offer`),
   
   // Seat management
   getOccupiedSeats: (flightId) => api.get(`/bookings/flights/${flightId}/occupied-seats`),
@@ -77,13 +117,15 @@ export const flightAPI = {
 };
 
 export const bookingAPI = {
-  // Reservations
+  // Reservations - using test endpoint for now
   createReservation: (data) => api.post('/bookings/reservations', data),
   getReservation: (id) => api.get(`/bookings/reservations/${id}`),
   getReservationByNumber: (reservationNumber) => 
     api.get(`/bookings/reservations/number/${reservationNumber}`),
   getReservationsByCustomer: (customerId) => 
     api.get(`/bookings/reservations/customer/${customerId}`),
+  getTicketsByCustomer: (customerId) => 
+    api.get(`/tickets/customer/${customerId}`),
   cancelReservation: (id, reason) => 
     api.post(`/bookings/reservations/${id}/cancel`, null, { params: { reason } }),
   

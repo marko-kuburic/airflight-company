@@ -39,7 +39,7 @@ public class Fare {
     @JoinColumn(name = "cabin_class_id")
     private CabinClass cabinClass;
     
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "offer_id")
     private Offer offer;
     

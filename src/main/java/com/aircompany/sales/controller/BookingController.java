@@ -2,6 +2,7 @@ package com.aircompany.sales.controller;
 
 import com.aircompany.sales.dto.CreateReservationDto;
 import com.aircompany.sales.dto.PaymentDto;
+import com.aircompany.sales.dto.ReservationResponse;
 import com.aircompany.sales.model.Reservation;
 import com.aircompany.sales.model.Payment;
 import com.aircompany.sales.model.Ticket;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -38,13 +40,20 @@ public class BookingController {
      * Create a new reservation with tickets
      */
     @PostMapping("/reservations")
+    @Transactional
     public ResponseEntity<?> createReservation(@Valid @RequestBody CreateReservationDto createDto) {
         try {
             logger.info("Creating reservation for offer: {}", createDto.getOfferId());
             
             Reservation reservation = bookingService.createReservation(createDto);
             
-            return ResponseEntity.status(HttpStatus.CREATED).body(reservation);
+            // Return simple map to avoid lazy loading issues
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("id", reservation.getId());
+            response.put("reservationNumber", reservation.getReservationNumber());
+            response.put("status", reservation.getStatus().toString());
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
             logger.error("Error creating reservation: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Error creating reservation: " + e.getMessage());
@@ -55,13 +64,22 @@ public class BookingController {
      * Process payment for reservation
      */
     @PostMapping("/payments")
+    @Transactional
     public ResponseEntity<?> processPayment(@Valid @RequestBody PaymentDto paymentDto) {
         try {
             logger.info("Processing payment for reservation: {}", paymentDto.getReservationId());
             
             Payment payment = bookingService.processPayment(paymentDto);
             
-            return ResponseEntity.ok(payment);
+            // Return simple map to avoid lazy loading issues
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("id", payment.getId());
+            response.put("amount", payment.getAmount());
+            response.put("status", payment.getStatus().toString());
+            response.put("method", payment.getMethod().toString());
+            response.put("transactionId", payment.getTransactionId());
+            
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error processing payment: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Error processing payment: " + e.getMessage());
@@ -104,9 +122,84 @@ public class BookingController {
      * Get reservations by customer ID
      */
     @GetMapping("/reservations/customer/{customerId}")
-    public ResponseEntity<List<Reservation>> getReservationsByCustomer(@PathVariable Long customerId) {
-        List<Reservation> reservations = reservationRepository.findByCustomerId(customerId);
-        return ResponseEntity.ok(reservations);
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getReservationsByCustomer(@PathVariable Long customerId) {
+        List<Reservation> reservations = reservationRepository.findByCustomerIdWithTickets(customerId);
+        
+        // Convert to simple DTOs to avoid lazy loading issues
+        List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
+        for (Reservation reservation : reservations) {
+            java.util.Map<String, Object> resMap = new java.util.HashMap<>();
+            resMap.put("id", reservation.getId());
+            resMap.put("reservationNumber", reservation.getReservationNumber());
+            resMap.put("status", reservation.getStatus().toString());
+            resMap.put("createdAt", reservation.getCreatedAt());
+            
+            // Add offer and flight info
+            if (reservation.getOffer() != null) {
+                java.util.Map<String, Object> offerMap = new java.util.HashMap<>();
+                offerMap.put("id", reservation.getOffer().getId());
+                offerMap.put("basePrice", reservation.getOffer().getBasePrice());
+                
+                if (reservation.getOffer().getFlight() != null) {
+                    java.util.Map<String, Object> flightMap = new java.util.HashMap<>();
+                    flightMap.put("id", reservation.getOffer().getFlight().getId());
+                    flightMap.put("flightNumber", reservation.getOffer().getFlight().getFlightNumber());
+                    flightMap.put("departureTime", reservation.getOffer().getFlight().getDepTime());
+                    flightMap.put("arrivalTime", reservation.getOffer().getFlight().getArrTime());
+                    flightMap.put("status", reservation.getOffer().getFlight().getStatus().toString());
+                    
+                    // Add route info if available
+                    if (reservation.getOffer().getFlight().getRoute() != null) {
+                        java.util.Map<String, Object> routeMap = new java.util.HashMap<>();
+                        routeMap.put("id", reservation.getOffer().getFlight().getRoute().getId());
+                        routeMap.put("name", reservation.getOffer().getFlight().getRoute().getName());
+                        routeMap.put("totalDistance", reservation.getOffer().getFlight().getRoute().getTotalDistance());
+                        
+                        flightMap.put("route", routeMap);
+                    }
+                    
+                    offerMap.put("flight", flightMap);
+                }
+                
+                resMap.put("offer", offerMap);
+            }
+            
+            // Add tickets
+            List<java.util.Map<String, Object>> ticketsList = new java.util.ArrayList<>();
+            for (Ticket ticket : reservation.getTickets()) {
+                java.util.Map<String, Object> ticketMap = new java.util.HashMap<>();
+                ticketMap.put("id", ticket.getId());
+                ticketMap.put("seatNumber", ticket.getSeatNumber());
+                ticketMap.put("price", ticket.getPrice());
+                ticketMap.put("status", ticket.getStatus().toString());
+                
+                // Add passenger info
+                if (ticket.getPassenger() != null) {
+                    java.util.Map<String, Object> passengerMap = new java.util.HashMap<>();
+                    passengerMap.put("firstName", ticket.getPassenger().getFirstName());
+                    passengerMap.put("lastName", ticket.getPassenger().getLastName());
+                    ticketMap.put("passenger", passengerMap);
+                }
+                
+                ticketsList.add(ticketMap);
+            }
+            resMap.put("tickets", ticketsList);
+            
+            // Add payment info if available
+            if (reservation.getPayment() != null) {
+                java.util.Map<String, Object> paymentMap = new java.util.HashMap<>();
+                paymentMap.put("id", reservation.getPayment().getId());
+                paymentMap.put("amount", reservation.getPayment().getAmount());
+                paymentMap.put("status", reservation.getPayment().getStatus().toString());
+                paymentMap.put("method", reservation.getPayment().getMethod().toString());
+                resMap.put("payment", paymentMap);
+            }
+            
+            response.add(resMap);
+        }
+        
+        return ResponseEntity.ok(response);
     }
     
     /**
@@ -123,8 +216,13 @@ public class BookingController {
      */
     @GetMapping("/flights/{flightId}/occupied-seats")
     public ResponseEntity<List<String>> getOccupiedSeats(@PathVariable Long flightId) {
-        List<String> occupiedSeats = ticketRepository.getOccupiedSeatsForFlight(flightId);
-        return ResponseEntity.ok(occupiedSeats);
+        try {
+            List<String> occupiedSeats = ticketRepository.getOccupiedSeatsForFlight(flightId);
+            return ResponseEntity.ok(occupiedSeats);
+        } catch (Exception e) {
+            logger.error("Error getting occupied seats for flight {}: {}", flightId, e.getMessage());
+            return ResponseEntity.badRequest().body(null);
+        }
     }
     
     /**
@@ -133,8 +231,13 @@ public class BookingController {
     @GetMapping("/flights/{flightId}/seats/{seatNumber}/availability")
     public ResponseEntity<?> checkSeatAvailability(@PathVariable Long flightId, 
                                                   @PathVariable String seatNumber) {
-        boolean isTaken = ticketRepository.isSeatTaken(flightId, seatNumber);
-        return ResponseEntity.ok(Map.of("available", !isTaken, "seatNumber", seatNumber));
+        try {
+            boolean isTaken = ticketRepository.isSeatTaken(flightId, seatNumber);
+            return ResponseEntity.ok(java.util.Map.of("available", !isTaken, "seatNumber", seatNumber));
+        } catch (Exception e) {
+            logger.error("Error checking seat availability: {}", e.getMessage());
+            return ResponseEntity.badRequest().body("Error checking seat availability: " + e.getMessage());
+        }
     }
     
     /**
@@ -145,7 +248,7 @@ public class BookingController {
                                               @RequestParam(required = false) String reason) {
         try {
             bookingService.cancelReservation(id, reason);
-            return ResponseEntity.ok(Map.of("message", "Reservation cancelled successfully"));
+            return ResponseEntity.ok(java.util.Map.of("message", "Reservation cancelled successfully"));
         } catch (Exception e) {
             logger.error("Error cancelling reservation: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Error cancelling reservation: " + e.getMessage());
@@ -172,19 +275,100 @@ public class BookingController {
         }
     }
     
-    // Helper for Map.of (Java 8 compatibility)
-    private static class Map {
-        public static java.util.Map<String, Object> of(String key1, Object value1, String key2, Object value2) {
-            java.util.Map<String, Object> map = new java.util.HashMap<>();
-            map.put(key1, value1);
-            map.put(key2, value2);
-            return map;
+    /**
+     * Get tickets by customer ID (alternative to reservations endpoint)
+     */
+    @GetMapping("/tickets/customer/{customerId}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getTicketsByCustomer(@PathVariable Long customerId) {
+        List<Ticket> tickets = ticketRepository.findByReservation_Customer_Id(customerId);
+
+        // Convert to DTOs with joined reservation/flight data
+        List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
+        for (Ticket ticket : tickets) {
+            java.util.Map<String, Object> ticketMap = new java.util.HashMap<>();
+            ticketMap.put("id", ticket.getId());
+            ticketMap.put("price", ticket.getPrice());
+            ticketMap.put("status", ticket.getStatus().toString());
+            ticketMap.put("seatNumber", ticket.getSeatNumber());
+            ticketMap.put("createdAt", ticket.getCreatedAt());
+
+            // Add passenger info
+            if (ticket.getPassenger() != null) {
+                java.util.Map<String, Object> passengerMap = new java.util.HashMap<>();
+                passengerMap.put("firstName", ticket.getPassenger().getFirstName());
+                passengerMap.put("lastName", ticket.getPassenger().getLastName());
+                passengerMap.put("email", ticket.getPassenger().getEmail());
+                ticketMap.put("passenger", passengerMap);
+            }
+
+            // Add reservation info
+            if (ticket.getReservation() != null) {
+                java.util.Map<String, Object> reservationMap = new java.util.HashMap<>();
+                reservationMap.put("id", ticket.getReservation().getId());
+                reservationMap.put("reservationNumber", ticket.getReservation().getReservationNumber());
+                reservationMap.put("status", ticket.getReservation().getStatus().toString());
+                reservationMap.put("createdAt", ticket.getReservation().getCreatedAt());
+
+                // Add payment info
+                if (ticket.getReservation().getPayment() != null) {
+                    java.util.Map<String, Object> paymentMap = new java.util.HashMap<>();
+                    paymentMap.put("amount", ticket.getReservation().getPayment().getAmount());
+                    paymentMap.put("status", ticket.getReservation().getPayment().getStatus().toString());
+                    reservationMap.put("payment", paymentMap);
+                }
+
+                // Add offer and flight info
+                if (ticket.getReservation().getOffer() != null) {
+                    java.util.Map<String, Object> offerMap = new java.util.HashMap<>();
+                    offerMap.put("id", ticket.getReservation().getOffer().getId());
+
+                    if (ticket.getReservation().getOffer().getFlight() != null) {
+                        java.util.Map<String, Object> flightMap = new java.util.HashMap<>();
+                        flightMap.put("id", ticket.getReservation().getOffer().getFlight().getId());
+                        flightMap.put("flightNumber", ticket.getReservation().getOffer().getFlight().getFlightNumber());
+                        flightMap.put("departureTime", ticket.getReservation().getOffer().getFlight().getDepTime());
+                        flightMap.put("arrivalTime", ticket.getReservation().getOffer().getFlight().getArrTime());
+                        flightMap.put("status", ticket.getReservation().getOffer().getFlight().getStatus().toString());
+
+                        // Add route info
+                        if (ticket.getReservation().getOffer().getFlight().getRoute() != null) {
+                            java.util.Map<String, Object> routeMap = new java.util.HashMap<>();
+                            routeMap.put("id", ticket.getReservation().getOffer().getFlight().getRoute().getId());
+                            routeMap.put("name", ticket.getReservation().getOffer().getFlight().getRoute().getName());
+                            routeMap.put("totalDistance", ticket.getReservation().getOffer().getFlight().getRoute().getTotalDistance());
+                            flightMap.put("route", routeMap);
+                        }
+
+                        offerMap.put("flight", flightMap);
+                    }
+
+                    // Add fare info (for cabin class)
+                    if (ticket.getReservation().getOffer().getFares() != null && !ticket.getReservation().getOffer().getFares().isEmpty()) {
+                        // For simplicity, use the first fare's cabin class
+                        java.util.Map<String, Object> fareMap = new java.util.HashMap<>();
+                        fareMap.put("cabinClass", java.util.Map.of("name", ticket.getReservation().getOffer().getFares().get(0).getCabinClass().getName()));
+                        offerMap.put("fare", fareMap);
+                    }
+
+                    reservationMap.put("offer", offerMap);
+                }
+                
+                // Add payment info
+                if (ticket.getReservation().getPayment() != null) {
+                    java.util.Map<String, Object> paymentMap = new java.util.HashMap<>();
+                    paymentMap.put("amount", ticket.getReservation().getPayment().getAmount());
+                    paymentMap.put("status", ticket.getReservation().getPayment().getStatus().toString());
+                    paymentMap.put("method", ticket.getReservation().getPayment().getMethod().toString());
+                    reservationMap.put("payment", paymentMap);
+                }
+
+                ticketMap.put("reservation", reservationMap);
+            }
+
+            response.add(ticketMap);
         }
-        
-        public static java.util.Map<String, Object> of(String key, Object value) {
-            java.util.Map<String, Object> map = new java.util.HashMap<>();
-            map.put(key, value);
-            return map;
-        }
+
+        return ResponseEntity.ok(response);
     }
 }

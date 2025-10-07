@@ -1,46 +1,50 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { authAPI, bookingAPI } from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate user and flight data loading
-    setTimeout(() => {
-      setUser({
-        firstName: "John",
-        lastName: "Doe",
-        email: "john.doe@example.com"
-      });
-      
-      setFlights([
-        {
-          id: 1,
-          origin: "Belgrade",
-          destination: "Paris",
-          date: "2024-02-15",
-          time: "14:30",
-          status: "Confirmed"
-        },
-        {
-          id: 2,
-          origin: "Paris",
-          destination: "Belgrade",
-          date: "2024-02-22",
-          time: "18:45",
-          status: "Pending"
-        }
-      ]);
-      
-      setLoading(false);
-    }, 1000);
+    loadUserData();
   }, []);
 
+  const loadUserData = async () => {
+    try {
+      // Get user data from localStorage or token
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      if (userData.id) {
+        setUser(userData);
+        
+        // Load user's reservations/flights
+        try {
+          const reservations = await bookingAPI.getReservationsByCustomer(userData.id);
+          setFlights(reservations.data || []);
+        } catch (error) {
+          console.log("No reservations found");
+          setFlights([]);
+        }
+      } else {
+        // If no user data, redirect to login
+        navigate('/login');
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      navigate('/login');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = () => {
-    console.log("Logging out...");
-    // TODO: Implement actual logout logic
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    toast.success('Logged out successfully');
+    navigate('/login');
   };
 
   if (loading) {

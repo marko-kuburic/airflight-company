@@ -53,8 +53,8 @@ export default function Register() {
           
           toast.success(`Welcome, ${userData.firstName}! Your account has been created.`);
           
-          // Redirect to dashboard
-          navigate('/dashboard');
+          // Redirect to search page
+          navigate('/search');
         } else {
           toast.success('Registration successful! Please log in.');
           navigate('/login');

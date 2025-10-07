@@ -1,16 +1,13 @@
 package com.aircompany.sales.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 
 public class FlightSearchRequest {
     
-    @NotBlank(message = "Origin is required")
-    private String origin;
+    private String origin; // Can be null/empty for "anywhere" searches
     
-    @NotBlank(message = "Destination is required")
-    private String destination;
+    private String destination; // Can be null/empty for "anywhere" searches
     
     @NotNull(message = "Departure date is required")
     private LocalDate departureDate;

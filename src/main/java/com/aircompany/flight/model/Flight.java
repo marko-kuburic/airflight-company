@@ -1,10 +1,12 @@
 package com.aircompany.flight.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.aircompany.hr.model.Schedule;
 import com.aircompany.hr.model.FlightDispatcher;
@@ -21,6 +23,10 @@ public class Flight {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    @NotBlank
+    @Column(name = "flight_number", nullable = false, unique = true)
+    private String flightNumber;
     
     @NotNull
     @Column(name = "dep_time", nullable = false)
@@ -44,14 +50,15 @@ public class Flight {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "aircraft_id")
+    @JsonIgnore
     private Aircraft aircraft;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "offer_id")
-    private Offer offer;
+    @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Offer> offers = new ArrayList<>();
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")
+    @JsonIgnore
     private Route route;
     
     @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -78,6 +85,14 @@ public class Flight {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public String getFlightNumber() {
+        return flightNumber;
+    }
+    
+    public void setFlightNumber(String flightNumber) {
+        this.flightNumber = flightNumber;
     }
     
     public LocalDateTime getDepTime() {
@@ -128,12 +143,12 @@ public class Flight {
         this.aircraft = aircraft;
     }
     
-    public Offer getOffer() {
-        return offer;
+    public List<Offer> getOffers() {
+        return offers;
     }
     
-    public void setOffer(Offer offer) {
-        this.offer = offer;
+    public void setOffers(List<Offer> offers) {
+        this.offers = offers;
     }
     
     public Route getRoute() {

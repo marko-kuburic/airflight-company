@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.aircompany.sales.model.Reservation;
 import java.math.BigDecimal;
@@ -38,7 +39,7 @@ public class Payment {
     private Integer loyaltyPointsUsed = 0;
     
     @Column(name = "cash_amount")
-    private BigDecimal cashAmount; // iznos plaćen novcem/karticom
+    private BigDecimal cashAmount; 
     
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -50,9 +51,9 @@ public class Payment {
     
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reservation_id")
+    @JsonIgnore
     private Reservation reservation;
     
-    // Constructors
     public Payment() {}
     
     public Payment(BigDecimal amount, PaymentMethod method, Reservation reservation) {
@@ -60,7 +61,7 @@ public class Payment {
         this.method = method;
         this.reservation = reservation;
         this.status = PaymentStatus.PENDING;
-        this.cashAmount = amount; // default: sve plaćeno novcem
+        this.cashAmount = amount; 
         this.loyaltyPointsUsed = 0;
     }
     
@@ -162,6 +163,6 @@ public class Payment {
         CASH,
         VOUCHER,
         LOYALTY_POINTS,
-        COMBINED // kombinacija poena i novca
+        COMBINED // npr. delimično kartica, delimično bodovi
     }
 }

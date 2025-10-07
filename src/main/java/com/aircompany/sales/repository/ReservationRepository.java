@@ -20,9 +20,10 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     Optional<Reservation> findByReservationNumber(String reservationNumber);
     
     /**
-     * Find reservations by customer ID
+     * Find reservations by customer ID with tickets
      */
-    List<Reservation> findByCustomerId(Long customerId);
+    @Query("SELECT DISTINCT r FROM Reservation r LEFT JOIN FETCH r.tickets t LEFT JOIN FETCH t.passenger LEFT JOIN FETCH r.offer o LEFT JOIN FETCH o.flight f LEFT JOIN FETCH f.aircraft LEFT JOIN FETCH f.route LEFT JOIN FETCH r.payment WHERE r.customer.id = :customerId")
+    List<Reservation> findByCustomerIdWithTickets(@Param("customerId") Long customerId);
     
     /**
      * Find reservations by status

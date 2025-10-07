@@ -52,4 +52,10 @@ public interface OfferRepository extends JpaRepository<Offer, Long> {
      */
     @Query("SELECT o FROM Offer o WHERE LOWER(o.title) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<Offer> searchByTitle(@Param("searchTerm") String searchTerm);
+
+    /**
+     * Find offer by ID with fares loaded
+     */
+    @Query("SELECT o FROM Offer o LEFT JOIN FETCH o.fares WHERE o.id = :id")
+    java.util.Optional<Offer> findByIdWithFares(@Param("id") Long id);
 }
