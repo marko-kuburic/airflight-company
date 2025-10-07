@@ -65,6 +65,7 @@ public abstract class User {
     
     // Constructors
     public User() {}
+
     
     public User(String firstName, String lastName, String email, String password) {
         this.firstName = firstName;
@@ -74,7 +75,8 @@ public abstract class User {
         this.status = UserStatus.ACTIVE;
     }
     
-    // Getters and Setters
+  
+    
     public Long getId() {
         return id;
     }
@@ -164,7 +166,7 @@ public abstract class User {
         this.auditLogs = auditLogs;
     }
     
-    // Nested Enum
+
     public enum UserStatus {
         ACTIVE,
         INACTIVE,
@@ -172,6 +174,5 @@ public abstract class User {
         TERMINATED
     }
     
-    // Abstract method to get user type
     public abstract String getUserType();
 }
