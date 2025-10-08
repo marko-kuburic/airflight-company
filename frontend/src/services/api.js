@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL || '/api';, // Use relative URL to go through nginx proxy
+  baseURL: process.env.REACT_APP_API_BASE_URL || '/api', // Use relative URL to go through nginx proxy
   timeout: 30000, // Increased to 30 seconds for slow analytics queries
   headers: {
     'Content-Type': 'application/json',
