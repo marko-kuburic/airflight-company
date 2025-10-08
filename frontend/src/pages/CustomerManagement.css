@@ -1,0 +1,125 @@
+.customer-management-wrapper {
+  min-height: 100vh;
+  background: #f7fafc;
+}
+
+.admin-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.admin-badge {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.admin-username {
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.admin-header-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.back-to-app-link {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-to-app-link:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.admin-logout-btn {
+  background: rgba(255, 255, 255, 0.95);
+  color: #667eea;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.admin-logout-btn:hover {
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Override Analytics styles when in admin panel */
+.customer-management-content .analytics-container {
+  display: block;
+}
+
+.customer-management-content .analytics-main {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .admin-header {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .admin-header-left,
+  .admin-header-right {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-badge {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .admin-username {
+    font-size: 14px;
+  }
+
+  .back-to-app-link,
+  .admin-logout-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}

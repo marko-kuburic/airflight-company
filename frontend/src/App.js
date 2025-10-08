@@ -13,7 +13,8 @@ import EditTicket from './pages/EditTicket';
 import MyProfile from './pages/MyProfile';
 import LoyaltyProgram from './pages/LoyaltyProgram';
 import Notifications from './pages/Notifications';
-import Analytics from './pages/Analytics';
+import AdminLogin from './pages/AdminLogin';
+import CustomerManagement from './pages/CustomerManagement';
 import { Sidebar } from './components/Sidebar';
 import './App.css';
 
@@ -35,7 +36,8 @@ function App() {
           <Route path="/profile" element={<MyProfile />} />
           <Route path="/loyalty" element={<LoyaltyProgram />} />
           <Route path="/notifications" element={<Notifications />} />
-          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/customer-management" element={<CustomerManagement />} />
         </Routes>
       </div>
     </Router>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { analyticsAPI } from '../services/api';
-import { Sidebar } from '../components/Sidebar';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -95,19 +94,14 @@ const Analytics = () => {
 
   if (loading) {
     return (
-      <div className="analytics-container">
-        <Sidebar />
-        <div className="analytics-main">
-          <div className="loading-spinner">Loading analytics...</div>
-        </div>
+      <div className="analytics-main">
+        <div className="loading-spinner">Loading analytics...</div>
       </div>
     );
   }
 
   return (
-    <div className="analytics-container">
-      <Sidebar />
-      <div className="analytics-main">
+    <div className="analytics-main">
         <div className="analytics-header">
           <div>
             <h1>Analytics Dashboard</h1>
@@ -389,7 +383,6 @@ const Analytics = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 
