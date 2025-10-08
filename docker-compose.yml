@@ -47,12 +47,6 @@ services:
         condition: service_healthy
     networks:
       - air-company-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
   # React Frontend
   frontend:
@@ -104,6 +98,30 @@ services:
       - air-company-network
     profiles:
       - nginx
+
+  # Database Initialization Service
+  db-init:
+    image: mysql:8.0
+    container_name: air-company-db-init
+    restart: "no"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-air_company}
+    volumes:
+      - ./docker/mysql/populate-database.sql:/tmp/populate-database.sql
+    depends_on:
+      - app
+    networks:
+      - air-company-network
+    command: >
+      bash -c "
+        echo 'Waiting for application to be ready...';
+        sleep 10;
+        echo 'Running database population script...';
+        mysql -h mysql -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} -e 'source /tmp/populate-database.sql';
+        echo 'Database population completed successfully!';
+        exit 0;
+      "
 
   # phpMyAdmin (database management)
   phpmyadmin:
