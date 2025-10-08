@@ -30,7 +30,6 @@ const navItems = [
   { label: 'My Profile', path: '/profile' },
   { label: 'Loyalty Program', path: '/loyalty' },
   { label: 'Notifications', path: '/notifications' },
-  { label: 'Analytics', path: '/analytics' },
 ];
 
 export function Sidebar() {
