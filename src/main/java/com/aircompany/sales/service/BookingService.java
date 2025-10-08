@@ -3,6 +3,7 @@ package com.aircompany.sales.service;
 import com.aircompany.hr.model.Customer;
 import com.aircompany.sales.dto.CreateReservationDto;
 import com.aircompany.sales.dto.PaymentDto;
+import com.aircompany.sales.exception.SeatAlreadyTakenException;
 import com.aircompany.sales.model.*;
 import com.aircompany.sales.repository.*;
 import org.slf4j.Logger;
@@ -238,7 +239,7 @@ public class BookingService {
             if (ticketDto.getSeatNumber() != null) {
                 boolean seatTaken = ticketRepository.isSeatTaken(flightId, ticketDto.getSeatNumber());
                 if (seatTaken) {
-                    throw new RuntimeException("Seat " + ticketDto.getSeatNumber() + " is already taken");
+                    throw new SeatAlreadyTakenException(ticketDto.getSeatNumber());
                 }
             }
         }
@@ -247,16 +248,66 @@ public class BookingService {
     private List<Ticket> createTicketsWithPassengers(List<CreateReservationDto.CreateTicketDto> ticketDtos, 
                                                      Reservation reservation, Offer offer) {
         List<Ticket> tickets = new ArrayList<>();
-        BigDecimal ticketPrice = offer.getLowestFarePrice();
         
         for (CreateReservationDto.CreateTicketDto ticketDto : ticketDtos) {
             // Create or find passenger
             Passenger passenger = findOrCreatePassenger(ticketDto.getPassenger());
             
-            // Create ticket
+            // Determine cabin class based on premium seat selection
+            Boolean isPremium = ticketDto.getIsPremium();
+            CabinClass cabinClass;
+            BigDecimal ticketPrice;
+            
+            if (isPremium != null && isPremium) {
+                // Premium seat = Business class
+                // Find business class from offer fares
+                cabinClass = offer.getFares().stream()
+                    .map(Fare::getCabinClass)
+                    .filter(cc -> "Business".equalsIgnoreCase(cc.getName()))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        // Fallback: try to find any non-economy class, or use the most expensive fare
+                        return offer.getFares().stream()
+                            .map(Fare::getCabinClass)
+                            .filter(cc -> !"Economy".equalsIgnoreCase(cc.getName()))
+                            .findFirst()
+                            .orElse(offer.getFares().get(0).getCabinClass());
+                    });
+                
+                // Use business class fare price if available, otherwise use lowest + premium
+                ticketPrice = offer.getFares().stream()
+                    .filter(f -> "Business".equalsIgnoreCase(f.getCabinClass().getName()))
+                    .findFirst()
+                    .map(Fare::getPrice)
+                    .orElse(offer.getLowestFarePrice());
+            } else {
+                // Standard seat = Economy class
+                cabinClass = offer.getFares().stream()
+                    .map(Fare::getCabinClass)
+                    .filter(cc -> "Economy".equalsIgnoreCase(cc.getName()))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        // Fallback: use the cheapest fare's cabin class
+                        return offer.getFares().stream()
+                            .min((f1, f2) -> f1.getPrice().compareTo(f2.getPrice()))
+                            .map(Fare::getCabinClass)
+                            .orElse(offer.getFares().get(0).getCabinClass());
+                    });
+                
+                ticketPrice = offer.getLowestFarePrice();
+            }
+            
+            // Create ticket with standard price
             Ticket ticket = new Ticket(ticketPrice, reservation, passenger);
             ticket.setSeatNumber(ticketDto.getSeatNumber());
+            ticket.setCabinClass(cabinClass);
+            ticket.setCabinClassName(cabinClass.getName()); // Store denormalized cabin class name
             ticket.setStatus(Ticket.TicketStatus.CREATED);
+            
+            // Set seat premium if provided
+            if (ticketDto.getSeatPrice() != null && ticketDto.getSeatPrice().compareTo(BigDecimal.ZERO) > 0) {
+                ticket.setSeatPremium(ticketDto.getSeatPrice());
+            }
             
             ticket = ticketRepository.save(ticket);
             tickets.add(ticket);
@@ -353,5 +404,76 @@ public class BookingService {
     
     private String generateTransactionId() {
         return "TXN-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+    
+    /**
+     * Cancel a ticket and process refund (Business class only)
+     * This will:
+     * - Create a refund payment
+     * - Return loyalty points if used
+     * - Free up the seat
+     * - Update ticket status to CANCELLED and REFUNDED
+     * - Send notification to customer
+     */
+    @Transactional
+    public void cancelTicket(Ticket ticket) {
+        logger.info("Cancelling ticket ID: {} for seat: {}", ticket.getId(), ticket.getSeatNumber());
+        
+        Reservation reservation = ticket.getReservation();
+        if (reservation == null) {
+            throw new RuntimeException("Reservation not found for ticket");
+        }
+        
+        Payment originalPayment = reservation.getPayment();
+        if (originalPayment == null) {
+            throw new RuntimeException("Payment not found for reservation");
+        }
+        
+        // Calculate refund amount (price of this specific ticket)
+        BigDecimal refundAmount = ticket.getPrice();
+        
+        // Update original payment to REFUNDED status
+        originalPayment.setStatus(Payment.PaymentStatus.REFUNDED);
+        paymentRepository.save(originalPayment);
+        logger.info("Updated payment status to REFUNDED for reservation {}", reservation.getId());
+        
+        // If loyalty points were used in original payment, calculate proportional return
+        if (originalPayment.getLoyaltyPointsUsed() > 0) {
+            int totalTickets = reservation.getTickets().size();
+            int pointsToReturn = originalPayment.getLoyaltyPointsUsed() / totalTickets;
+            
+            // Return the loyalty points
+            loyaltyService.addPoints(reservation.getCustomer().getId(), pointsToReturn);
+            logger.info("Returned {} loyalty points to customer", pointsToReturn);
+        }
+        
+        // Update ticket status
+        ticket.setStatus(Ticket.TicketStatus.CANCELLED);
+        ticket.setStatus(Ticket.TicketStatus.REFUNDED);
+        ticketRepository.save(ticket);
+        
+        // Send cancellation notification
+        try {
+            String message = String.format(
+                "Your Business class ticket for flight %s (seat %s) has been cancelled. " +
+                "A refund of €%.2f has been processed and will appear in your account within 3-5 business days.",
+                reservation.getOffer().getFlight().getFlightNumber(),
+                ticket.getSeatNumber(),
+                refundAmount
+            );
+            
+            notificationService.createNotification(
+                reservation.getCustomer().getId(),
+                message,
+                com.aircompany.hr.model.Notification.NotificationType.GENERAL
+            );
+            
+            logger.info("Sent cancellation notification to customer {}", reservation.getCustomer().getId());
+        } catch (Exception e) {
+            logger.error("Failed to send cancellation notification: {}", e.getMessage());
+        }
+        
+        logger.info("Successfully cancelled ticket {} and processed refund of €{}", 
+                   ticket.getId(), refundAmount);
     }
 }

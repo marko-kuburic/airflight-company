@@ -35,7 +35,7 @@ public class OfferService {
     private EntityManager entityManager;
     
     /**
-     * Get all active offers for a specific flight
+     * Get all active offers for a specific flight (only if flight hasn't departed)
      */
     public List<Offer> getActiveOffersForFlight(Long flightId) {
         TypedQuery<Offer> query = entityManager.createQuery(
@@ -43,6 +43,7 @@ public class OfferService {
             "WHERE o.flight.id = :flightId " +
             "AND o.isActive = true " +
             "AND (o.expiresAt IS NULL OR o.expiresAt > :now) " +
+            "AND o.flight.depTime > :now " +
             "ORDER BY o.discountPercentage DESC",
             Offer.class
         );
@@ -76,13 +77,14 @@ public class OfferService {
     }
     
     /**
-     * Get all active offers
+     * Get all active offers (only for flights that haven't departed)
      */
     public List<Offer> getAllActiveOffers() {
         TypedQuery<Offer> query = entityManager.createQuery(
             "SELECT o FROM Offer o " +
             "WHERE o.isActive = true " +
             "AND (o.expiresAt IS NULL OR o.expiresAt > :now) " +
+            "AND o.flight.depTime > :now " +
             "ORDER BY o.createdAt DESC",
             Offer.class
         );
@@ -140,7 +142,7 @@ public class OfferService {
         offer.setBasePrice(dynamicPricingService.getBasePrice(flight));
         offer.setIsActive(true);
         
-        // Save offer first
+        // Save offer first to get the ID
         offer = offerRepository.save(offer);
         
         // Create fares for each cabin class with current dynamic pricing
@@ -154,8 +156,8 @@ public class OfferService {
             fare.setCabinClass(cabinClass);
             fare.setOffer(offer);
             
-            // Calculate current dynamic price
-            BigDecimal dynamicPrice = calculateCurrentFarePrice(cabinClass, flight);
+            // Calculate current dynamic price with offer-specific randomization
+            BigDecimal dynamicPrice = calculateCurrentFarePrice(cabinClass, flight, offer.getId());
             fare.setPrice(dynamicPrice);
             
             entityManager.persist(fare);
@@ -168,9 +170,9 @@ public class OfferService {
         return offer;
     }
     
-    private BigDecimal calculateCurrentFarePrice(CabinClass cabinClass, Flight flight) {
-        // Get current dynamic price for flight
-        BigDecimal flightDynamicPrice = dynamicPricingService.getCurrentPrice(flight);
+    private BigDecimal calculateCurrentFarePrice(CabinClass cabinClass, Flight flight, Long offerId) {
+        // Get current dynamic price for flight with offer-specific randomization
+        BigDecimal flightDynamicPrice = dynamicPricingService.getCurrentPriceForOffer(flight, offerId);
         
         // Apply cabin class multiplier to dynamic price
         BigDecimal cabinMultiplier = getCabinClassMultiplier(cabinClass.getName());

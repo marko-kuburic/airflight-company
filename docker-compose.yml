@@ -47,6 +47,10 @@ services:
         condition: service_healthy
     networks:
       - air-company-network
+    # Disable healthcheck since curl is not available in openjdk:17-jdk-slim
+    # The app is working even if marked as unhealthy
+    healthcheck:
+      disable: true
 
   # React Frontend
   frontend:

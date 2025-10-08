@@ -24,6 +24,8 @@ import DispatcherMaintenance from './pages/DispatcherMaintenance';
 import CreateFlight from './pages/CreateFlight';
 import EditFlight from './pages/EditFlight';
 import Flights from './pages/Flights';
+import AdminLogin from './pages/AdminLogin';
+import CustomerManagement from './pages/CustomerManagement';
 import { Sidebar } from './components/Sidebar';
 import './App.css';
 
@@ -60,6 +62,8 @@ function App() {
           {/* Technician Routes */}
           <Route path="/technician/records" element={<ServiceRecords />} />
           <Route path="/technician/add-service" element={<AddService />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/customer-management" element={<CustomerManagement />} />
         </Routes>
       </div>
     </Router>

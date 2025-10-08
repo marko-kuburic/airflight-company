@@ -3,8 +3,8 @@ import toast from 'react-hot-toast';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api',
-  timeout: 10000,
+  baseURL: process.env.REACT_APP_API_BASE_URL || '/api';, // Use relative URL to go through nginx proxy
+  timeout: 30000, // Increased to 30 seconds for slow analytics queries
   headers: {
     'Content-Type': 'application/json',
   },
@@ -143,6 +143,14 @@ export const bookingAPI = {
     api.get(`/bookings/reservations/${reservationId}/tickets`),
   updateTicketStatus: (ticketId, status) => 
     api.patch(`/bookings/tickets/${ticketId}/status`, null, { params: { status } }),
+  
+  // Cancel ticket (Business class only)
+  cancelTicket: (ticketId) => 
+    api.delete(`/bookings/tickets/${ticketId}/cancel`),
+  
+  // Complete ticket and award loyalty points
+  completeTicket: (ticketId) =>
+    api.post(`/tickets/${ticketId}/complete`),
 };
 
 export const passengerAPI = {
@@ -234,6 +242,22 @@ export const segmentAPI = {
   createSegment: (data) => api.post('/flight/segments', data),
   updateSegment: (id, data) => api.put(`/flight/segments/${id}`, data),
   deleteSegment: (id) => api.delete(`/flight/segments/${id}`),
+};
+export const analyticsAPI = {
+  getDashboardSummary: () => api.get('/analytics/dashboard'),
+  getFinancialIndicators: (flightId, startDate, endDate) => 
+    api.get('/analytics/financial', { params: { flightId, startDate, endDate } }),
+  getOccupancyByCabinClass: (flightId, startDate, endDate) => 
+    api.get('/analytics/occupancy/cabin-class', { params: { flightId, startDate, endDate } }),
+  getOccupancyBySeason: (year) => 
+    api.get('/analytics/occupancy/season', { params: { year } }),
+  getCancellationRate: (startDate, endDate, reason) => 
+    api.get('/analytics/cancellation-rate', { params: { startDate, endDate, reason } }),
+  getRoutePerformance: (routeId, startDate, endDate) => 
+    api.get('/analytics/routes/performance', { params: { routeId, startDate, endDate } }),
+  getLoyaltyStatistics: () => api.get('/analytics/loyalty'),
+  getSalesReport: (startDate, endDate, period) => 
+    api.get('/analytics/sales-report', { params: { startDate, endDate, period } }),
 };
 
 // Utility functions

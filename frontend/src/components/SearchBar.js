@@ -7,13 +7,21 @@ import { SearchDropdown } from "./SearchDropdown";
 export function SearchBar({ onSearchResults }) {
   const [from, setFrom] = useState("Anywhere");
   const [to, setTo] = useState("Anywhere");
-  // Set default date to today's date
+  // Set default date to tomorrow's date and calculate min date
   const [date, setDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0]; // Format as YYYY-MM-DD
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  
+  // Calculate tomorrow's date for min attribute
+  const minDate = (() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  })();
 
   const handleSearch = async () => {
     try {
@@ -96,6 +104,7 @@ export function SearchBar({ onSearchResults }) {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
+            min={minDate}
             className="h-7 px-2.5 text-xs rounded-md outline-none"
             style={{
               backgroundColor: "#F6F8FB",

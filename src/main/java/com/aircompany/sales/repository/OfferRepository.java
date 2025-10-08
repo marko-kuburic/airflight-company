@@ -18,15 +18,16 @@ public interface OfferRepository extends JpaRepository<Offer, Long> {
     List<Offer> findByIsActiveTrue();
     
     /**
-     * Find valid (active and not expired) offers
+     * Find valid (active and not expired) offers with flights that haven't departed yet
      */
-    @Query("SELECT o FROM Offer o WHERE o.isActive = true AND (o.expiresAt IS NULL OR o.expiresAt > :now)")
+    @Query("SELECT o FROM Offer o WHERE o.isActive = true AND (o.expiresAt IS NULL OR o.expiresAt > :now) AND o.flight.depTime > :now")
     List<Offer> findValidOffers(@Param("now") LocalDateTime now);
     
     /**
-     * Find offers by flight ID
+     * Find offers by flight ID - only for flights that haven't departed
      */
-    List<Offer> findByFlightId(Long flightId);
+    @Query("SELECT o FROM Offer o WHERE o.flight.id = :flightId AND o.flight.depTime > :now")
+    List<Offer> findByFlightId(@Param("flightId") Long flightId, @Param("now") LocalDateTime now);
     
     /**
      * Find expired offers that are still marked as active
@@ -48,10 +49,10 @@ public interface OfferRepository extends JpaRepository<Offer, Long> {
     List<Offer> findByMinimumDiscount(@Param("minDiscount") java.math.BigDecimal minDiscount);
     
     /**
-     * Search offers by title (case insensitive)
+     * Search offers by title (case insensitive) - only for flights that haven't departed
      */
-    @Query("SELECT o FROM Offer o WHERE LOWER(o.title) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
-    List<Offer> searchByTitle(@Param("searchTerm") String searchTerm);
+    @Query("SELECT o FROM Offer o WHERE LOWER(o.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) AND o.flight.depTime > :now")
+    List<Offer> searchByTitle(@Param("searchTerm") String searchTerm, @Param("now") LocalDateTime now);
 
     /**
      * Find offer by ID with fares loaded

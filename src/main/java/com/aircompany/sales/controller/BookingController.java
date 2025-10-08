@@ -3,6 +3,7 @@ package com.aircompany.sales.controller;
 import com.aircompany.sales.dto.CreateReservationDto;
 import com.aircompany.sales.dto.PaymentDto;
 import com.aircompany.sales.dto.ReservationResponse;
+import com.aircompany.sales.exception.SeatAlreadyTakenException;
 import com.aircompany.sales.model.Reservation;
 import com.aircompany.sales.model.Payment;
 import com.aircompany.sales.model.Ticket;
@@ -54,6 +55,9 @@ public class BookingController {
             response.put("status", reservation.getStatus().toString());
             
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (SeatAlreadyTakenException e) {
+            logger.error("Seat already taken: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Error: " + e.getMessage());
         } catch (Exception e) {
             logger.error("Error creating reservation: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Error creating reservation: " + e.getMessage());
@@ -281,17 +285,31 @@ public class BookingController {
     @GetMapping("/tickets/customer/{customerId}")
     @Transactional(readOnly = true)
     public ResponseEntity<?> getTicketsByCustomer(@PathVariable Long customerId) {
+        logger.info("=== FETCHING TICKETS FOR CUSTOMER {} ===", customerId);
         List<Ticket> tickets = ticketRepository.findByReservation_Customer_Id(customerId);
+        logger.info("Found {} tickets for customer {}", tickets.size(), customerId);
 
         // Convert to DTOs with joined reservation/flight data
         List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
         for (Ticket ticket : tickets) {
+            logger.info("Processing ticket ID: {}, Seat: {}", ticket.getId(), ticket.getSeatNumber());
+            
             java.util.Map<String, Object> ticketMap = new java.util.HashMap<>();
             ticketMap.put("id", ticket.getId());
             ticketMap.put("price", ticket.getPrice());
             ticketMap.put("status", ticket.getStatus().toString());
             ticketMap.put("seatNumber", ticket.getSeatNumber());
             ticketMap.put("createdAt", ticket.getCreatedAt());
+            
+            // Use denormalized cabin class name stored directly on ticket
+            String cabinClassName = ticket.getCabinClassName();
+            if (cabinClassName != null && !cabinClassName.isEmpty()) {
+                logger.info("Ticket {} has cabin class name: {}", ticket.getId(), cabinClassName);
+                ticketMap.put("cabinClass", cabinClassName);
+            } else {
+                logger.warn("Ticket {} has NULL/empty cabin class name! Using ECONOMY as fallback", ticket.getId());
+                ticketMap.put("cabinClass", "ECONOMY"); // Default fallback
+            }
 
             // Add passenger info
             if (ticket.getPassenger() != null) {
@@ -370,5 +388,67 @@ public class BookingController {
         }
 
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Cancel a ticket (Business class only)
+     * This will:
+     * - Check if ticket is Business class
+     * - Create a refund payment
+     * - Free up the seat
+     * - Delete ticket and reservation from database
+     */
+    @DeleteMapping("/tickets/{ticketId}/cancel")
+    @Transactional
+    public ResponseEntity<?> cancelTicket(@PathVariable Long ticketId) {
+        try {
+            logger.info("Attempting to cancel ticket: {}", ticketId);
+            
+            // Get the ticket
+            Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket not found with ID: " + ticketId));
+            
+            // Check if ticket has Business class cabin using denormalized field
+            String cabinClassName = ticket.getCabinClassName();
+            if (cabinClassName == null || !cabinClassName.equalsIgnoreCase("BUSINESS")) {
+                logger.warn("Ticket {} is not Business class (class: {}), cancellation not allowed", 
+                    ticketId, cabinClassName);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(java.util.Map.of(
+                        "success", false,
+                        "message", "Only Business class tickets can be cancelled"
+                    ));
+            }
+            
+            // Check if ticket is already cancelled or refunded
+            if (ticket.getStatus() == Ticket.TicketStatus.CANCELLED || 
+                ticket.getStatus() == Ticket.TicketStatus.REFUNDED) {
+                logger.warn("Ticket {} is already cancelled/refunded", ticketId);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Map.of(
+                        "success", false,
+                        "message", "Ticket is already cancelled"
+                    ));
+            }
+            
+            // Call service method to handle cancellation
+            bookingService.cancelTicket(ticket);
+            
+            logger.info("Successfully cancelled ticket: {}", ticketId);
+            
+            return ResponseEntity.ok(java.util.Map.of(
+                "success", true,
+                "message", "Ticket cancelled successfully. Your refund has been processed.",
+                "refundAmount", ticket.getPrice()
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error cancelling ticket {}: {}", ticketId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of(
+                    "success", false,
+                    "message", "Error cancelling ticket: " + e.getMessage()
+                ));
+        }
     }
 }

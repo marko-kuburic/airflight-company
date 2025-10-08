@@ -1,35 +1,87 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from 'axios';
 
 // Simple utility function to combine class names
 const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
 };
 
-export function SeatSelection({ onSeatSelect, onPriceChange }) {
-  const [selectedSeat, setSelectedSeat] = useState(null);
+// Initial seat layout (premium seats marked, but availability comes from backend)
+const initialSeatLayout = {
+  "1-A": "available", "1-B": "available", "1-C": "premium", "1-D": "available", "1-E": "available", "1-F": "available",
+  "2-A": "available", "2-B": "available", "2-C": "available", "2-D": "premium", "2-E": "premium", "2-F": "available",
+  "3-A": "available", "3-B": "premium", "3-C": "available", "3-D": "available", "3-E": "available", "3-F": "available",
+  "4-A": "available", "4-B": "available", "4-C": "available", "4-D": "available", "4-E": "premium", "4-F": "available",
+  "5-A": "available", "5-B": "available", "5-C": "available", "5-D": "available", "5-E": "available", "5-F": "available",
+  "6-A": "available", "6-B": "premium", "6-C": "available", "6-D": "available", "6-E": "available", "6-F": "available",
+  "R1-A": "premium", "R1-B": "available", "R1-C": "available",
+  "R2-A": "available", "R2-B": "available", "R2-C": "premium",
+  "R3-A": "available", "R3-B": "premium", "R3-C": "available",
+  "R4-A": "available", "R4-B": "available", "R4-C": "available",
+  "R5-A": "available", "R5-B": "available", "R5-C": "premium",
+  "R6-A": "available", "R6-B": "available", "R6-C": "available",
+};
 
-  // Premium seat pricing
-  const PREMIUM_SEAT_PRICE = 20.00; // €20 for premium seats
+export function SeatSelection({ onSeatSelect, onPriceChange, flightId }) {
+  const [selectedSeat, setSelectedSeat] = useState(null);
+  const [seatData, setSeatData] = useState(initialSeatLayout);
+  const [seatPrices] = useState(() => {
+    // Generate dynamic pricing for premium seats (30-70 USD range)
+    const prices = {};
+    Object.keys(initialSeatLayout).forEach(seatId => {
+      if (initialSeatLayout[seatId] === 'premium') {
+        // Random price between 30 and 70
+        prices[seatId] = Math.floor(Math.random() * 41) + 30; // 30-70 range
+      }
+    });
+    return prices;
+  });
+
+  // Fetch occupied seats from backend
+  useEffect(() => {
+    console.log('SeatSelection - flightId prop received:', flightId);
+    console.log('SeatSelection - flightId type:', typeof flightId);
+    
+    if (flightId) {
+      const apiUrl = `/api/bookings/flights/${flightId}/occupied-seats`;
+      console.log('SeatSelection - Fetching occupied seats from:', apiUrl);
+      
+      axios.get(apiUrl)
+        .then(response => {
+          const occupiedSeats = response.data;
+          console.log('SeatSelection - Occupied seats for flight', flightId, ':', occupiedSeats);
+          console.log('SeatSelection - Number of occupied seats:', occupiedSeats.length);
+          
+          // Update seat data to mark occupied seats as unavailable
+          const updatedSeatData = { ...initialSeatLayout };
+          occupiedSeats.forEach(seatNumber => {
+            console.log('SeatSelection - Marking seat as unavailable:', seatNumber);
+            if (updatedSeatData[seatNumber]) {
+              updatedSeatData[seatNumber] = 'unavailable';
+            } else {
+              console.warn('SeatSelection - Seat not found in layout:', seatNumber);
+            }
+          });
+          console.log('SeatSelection - Updated seat data:', updatedSeatData);
+          setSeatData(updatedSeatData);
+        })
+        .catch(error => {
+          console.error('SeatSelection - Error fetching occupied seats:', error);
+          console.error('SeatSelection - Error details:', error.response?.data);
+          console.error('SeatSelection - Error status:', error.response?.status);
+          // Use initial layout if fetch fails
+          setSeatData(initialSeatLayout);
+        });
+    } else {
+      console.log('SeatSelection - No flightId provided, using initial layout');
+      setSeatData(initialSeatLayout);
+    }
+  }, [flightId]);
 
   const rows = 6;
   const leftSection = ["A", "B", "C"];
   const middleSection = ["D", "E", "F"];
   const rightSection = ["A", "B", "C"];
-
-  const seatData = {
-    "1-A": "available", "1-B": "available", "1-C": "premium", "1-D": "available", "1-E": "unavailable", "1-F": "available",
-    "2-A": "available", "2-B": "available", "2-C": "available", "2-D": "premium", "2-E": "premium", "2-F": "available",
-    "3-A": "available", "3-B": "premium", "3-C": "available", "3-D": "available", "3-E": "available", "3-F": "available",
-    "4-A": "available", "4-B": "available", "4-C": "available", "4-D": "available", "4-E": "premium", "4-F": "available",
-    "5-A": "available", "5-B": "available", "5-C": "available", "5-D": "available", "5-E": "available", "5-F": "unavailable",
-    "6-A": "available", "6-B": "premium", "6-C": "available", "6-D": "available", "6-E": "available", "6-F": "available",
-    "R1-A": "premium", "R1-B": "available", "R1-C": "available",
-    "R2-A": "available", "R2-B": "available", "R2-C": "premium",
-    "R3-A": "available", "R3-B": "premium", "R3-C": "available",
-    "R4-A": "available", "R4-B": "available", "R4-C": "available",
-    "R5-A": "available", "R5-B": "available", "R5-C": "premium",
-    "R6-A": "available", "R6-B": "available", "R6-C": "available",
-  };
 
   const getSeatStyle = (seatId, status) => {
     const isSelected = selectedSeat === seatId;
@@ -81,9 +133,9 @@ export function SeatSelection({ onSeatSelect, onPriceChange }) {
       const newSelectedSeat = selectedSeat === seatId ? null : seatId;
       setSelectedSeat(newSelectedSeat);
       
-      // Calculate pricing
+      // Calculate pricing - use dynamic price for premium seats
       const isPremium = status === "premium";
-      const seatPrice = isPremium ? PREMIUM_SEAT_PRICE : 0;
+      const seatPrice = isPremium ? (seatPrices[seatId] || 50) : 0; // Default to 50 if not found
       
       if (onSeatSelect) {
         onSeatSelect(newSelectedSeat, { isPremium, price: seatPrice });
@@ -135,11 +187,23 @@ export function SeatSelection({ onSeatSelect, onPriceChange }) {
                         e.target.style.opacity = '1';
                       }}
                       title={
-                        status === "premium" ? `Premium seat (+€${PREMIUM_SEAT_PRICE})` :
+                        status === "premium" ? `Premium seat (+$${seatPrices[seatId] || 50})` :
                         status === "unavailable" ? "Seat unavailable" :
                         "Standard seat (included)"
                       }
-                    />
+                    >
+                      {status === 'premium' && (
+                        <span style={{
+                          fontSize: '8px',
+                          fontWeight: '600',
+                          color: '#fff',
+                          display: 'block',
+                          lineHeight: '1'
+                        }}>
+                          ${seatPrices[seatId] || 50}
+                        </span>
+                      )}
+                    </button>
                   );
                 })}
               </div>
@@ -261,7 +325,7 @@ export function SeatSelection({ onSeatSelect, onPriceChange }) {
             backgroundColor: '#f59e0b',
             border: '1px solid #f59e0b'
           }} />
-          <span>Premium (+€{PREMIUM_SEAT_PRICE})</span>
+          <span>Premium ($30-$70)</span>
         </div>
         <div style={legendItemStyle}>
           <div style={{
@@ -286,11 +350,73 @@ export function SeatSelection({ onSeatSelect, onPriceChange }) {
           <div style={{ marginBottom: '4px' }}>
             ✓ Selected seat: <strong>{selectedSeat}</strong>
           </div>
-          <div>
+          <div style={{ marginBottom: '8px' }}>
             {seatData[selectedSeat] === "premium" 
-              ? `Premium seat - Additional €${PREMIUM_SEAT_PRICE}` 
+              ? `Premium seat - Additional $${seatPrices[selectedSeat] || 50}` 
               : 'Standard seat - Included in ticket price'
             }
+          </div>
+          
+          {/* Luggage Allowance Visualization */}
+          <div style={{
+            marginTop: '12px',
+            paddingTop: '12px',
+            borderTop: '1px solid #dbeafe'
+          }}>
+            <div style={{ 
+              fontSize: '11px', 
+              fontWeight: '600',
+              color: '#1e3a8a',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Luggage Allowance
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              gap: '16px',
+              alignItems: 'center'
+            }}>
+              {seatData[selectedSeat] === "premium" ? (
+                // Business Class - Checked bag + Handbag
+                <>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span style={{ fontSize: '28px' }}>🧳</span>
+                    <span style={{ fontSize: '10px', color: '#1e40af' }}>Checked Bag</span>
+                    <span style={{ fontSize: '9px', color: '#6b7280' }}>23 kg</span>
+                  </div>
+                  <span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span style={{ fontSize: '28px' }}>👜</span>
+                    <span style={{ fontSize: '10px', color: '#1e40af' }}>Handbag</span>
+                    <span style={{ fontSize: '9px', color: '#6b7280' }}>8 kg</span>
+                  </div>
+                </>
+              ) : (
+                // Economy Class - Handbag only
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <span style={{ fontSize: '28px' }}>👜</span>
+                  <span style={{ fontSize: '10px', color: '#1e40af' }}>Handbag</span>
+                  <span style={{ fontSize: '9px', color: '#6b7280' }}>8 kg</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

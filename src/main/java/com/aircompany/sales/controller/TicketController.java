@@ -2,6 +2,8 @@ package com.aircompany.sales.controller;
 
 import com.aircompany.sales.model.Ticket;
 import com.aircompany.sales.repository.TicketRepository;
+import com.aircompany.sales.service.NotificationService;
+import com.aircompany.sales.service.LoyaltyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,12 @@ public class TicketController {
     
     @Autowired
     private TicketRepository ticketRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
+    
+    @Autowired
+    private LoyaltyService loyaltyService;
     
     @GetMapping("/customer/{customerId}")
     @Transactional(readOnly = true)
@@ -77,14 +85,28 @@ public class TicketController {
                             
                             if (offer.getFlight().getRoute() != null) {
                                 flightInfo.put("route", offer.getFlight().getRoute().getName());
+                                flightInfo.put("distance", offer.getFlight().getRoute().getTotalDistance());
                             }
                             
                             dto.put("flight", flightInfo);
                         }
-                        
-                        // Cabin class from fares
-                        if (offer.getFares() != null && !offer.getFares().isEmpty()) {
-                            dto.put("cabinClass", offer.getFares().get(0).getCabinClass().getName());
+                    }
+                    
+                    // Use denormalized cabin class name stored directly on ticket
+                    String cabinClassName = ticket.getCabinClassName();
+                    if (cabinClassName != null && !cabinClassName.isEmpty()) {
+                        dto.put("cabinClass", cabinClassName);
+                    } else {
+                        // Fallback to fare cabin class if needed
+                        if (ticket.getReservation() != null && ticket.getReservation().getOffer() != null) {
+                            var offer = ticket.getReservation().getOffer();
+                            if (offer.getFares() != null && !offer.getFares().isEmpty()) {
+                                dto.put("cabinClass", offer.getFares().get(0).getCabinClass().getName());
+                            } else {
+                                dto.put("cabinClass", "ECONOMY");
+                            }
+                        } else {
+                            dto.put("cabinClass", "ECONOMY");
                         }
                     }
                     
@@ -96,6 +118,74 @@ public class TicketController {
         } catch (Exception e) {
             logger.error("Error fetching tickets for customer {}: {}", customerId, e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to fetch tickets: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Mark ticket as completed and reward loyalty points
+     */
+    @PostMapping("/{ticketId}/complete")
+    @Transactional
+    public ResponseEntity<?> completeTicket(@PathVariable Long ticketId) {
+        try {
+            logger.info("Completing ticket: {}", ticketId);
+            
+            Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+            
+            // Only process if ticket is CONFIRMED
+            if (ticket.getStatus() != Ticket.TicketStatus.CONFIRMED) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Ticket is not in CONFIRMED status"));
+            }
+            
+            // Update ticket status to USED
+            ticket.setStatus(Ticket.TicketStatus.USED);
+            ticketRepository.save(ticket);
+            
+            // Calculate loyalty points based on distance (1 km = 1 point)
+            Integer loyaltyPoints = 0;
+            if (ticket.getReservation() != null && 
+                ticket.getReservation().getOffer() != null &&
+                ticket.getReservation().getOffer().getFlight() != null &&
+                ticket.getReservation().getOffer().getFlight().getRoute() != null) {
+                
+                loyaltyPoints = ticket.getReservation().getOffer()
+                    .getFlight().getRoute().getTotalDistance().intValue();
+                
+                // Award points to customer
+                if (ticket.getReservation().getCustomer() != null) {
+                    loyaltyService.addPoints(ticket.getReservation().getCustomer().getId(), loyaltyPoints);
+                    
+                    // Create permanent notification
+                    String message = String.format(
+                        "Flight %s completed! You traveled %,d km and earned %,d loyalty points. Safe travels! ✈️",
+                        ticket.getReservation().getOffer().getFlight().getFlightNumber(),
+                        loyaltyPoints,
+                        loyaltyPoints
+                    );
+                    
+                    notificationService.createNotification(
+                        ticket.getReservation().getCustomer().getId(),
+                        message,
+                        com.aircompany.hr.model.Notification.NotificationType.GENERAL
+                    );
+                    
+                    logger.info("Awarded {} points to customer {} for completed flight", 
+                               loyaltyPoints, ticket.getReservation().getCustomer().getId());
+                }
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("ticketId", ticketId);
+            response.put("loyaltyPoints", loyaltyPoints);
+            response.put("message", "Flight completed successfully");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error completing ticket {}: {}", ticketId, e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to complete ticket: " + e.getMessage()));
         }
     }
 }
