@@ -116,7 +116,7 @@ public class DynamicPricingService {
         BigDecimal timeOfDayMultiplier = calculateTimeOfDayMultiplier(flight.getDepTime());
         
         // Apply micro-fluctuation (±$0.50 - $2.00 per refresh to simulate real-time changes)
-        BigDecimal microFluctuation = calculateMicroFluctuation(flight.getId());
+        BigDecimal microFluctuation = calculateMicroFluctuation(flight.getId(), null);
         
         // Calculate final price
         BigDecimal finalPrice = basePrice
@@ -129,6 +129,45 @@ public class DynamicPricingService {
         
         logger.debug("Dynamic pricing for flight {}: base={}, demand={}, season={}, weekend={}, time={}, timeOfDay={}, fluctuation={}, final={}", 
             flight.getId(), basePrice, demandMultiplier, seasonalMultiplier, weekendMultiplier, timeMultiplier, timeOfDayMultiplier, microFluctuation, finalPrice);
+        
+        return finalPrice.setScale(2, RoundingMode.HALF_UP);
+    }
+    
+    /**
+     * Calculate current dynamic price with offer-specific randomization
+     */
+    public BigDecimal getCurrentPriceForOffer(Flight flight, Long offerId) {
+        BigDecimal basePrice = getBasePrice(flight);
+        
+        // Apply demand-based multiplier
+        BigDecimal demandMultiplier = calculateDemandMultiplier(flight);
+        
+        // Apply seasonal multiplier
+        BigDecimal seasonalMultiplier = calculateSeasonalMultiplier(flight.getDepTime());
+        
+        // Apply weekend multiplier
+        BigDecimal weekendMultiplier = calculateWeekendMultiplier(flight.getDepTime());
+        
+        // Apply time-based multiplier (early booking vs last minute)
+        BigDecimal timeMultiplier = calculateTimeBasedMultiplier(flight.getDepTime());
+        
+        // Apply time-of-day multiplier (early morning/late night cheaper)
+        BigDecimal timeOfDayMultiplier = calculateTimeOfDayMultiplier(flight.getDepTime());
+        
+        // Apply micro-fluctuation with offer-specific seed for unique prices per offer
+        BigDecimal microFluctuation = calculateMicroFluctuation(flight.getId(), offerId);
+        
+        // Calculate final price
+        BigDecimal finalPrice = basePrice
+            .multiply(demandMultiplier)
+            .multiply(seasonalMultiplier)
+            .multiply(weekendMultiplier)
+            .multiply(timeMultiplier)
+            .multiply(timeOfDayMultiplier)
+            .add(microFluctuation);
+        
+        logger.debug("Dynamic pricing for flight {} offer {}: base={}, demand={}, season={}, weekend={}, time={}, timeOfDay={}, fluctuation={}, final={}", 
+            flight.getId(), offerId, basePrice, demandMultiplier, seasonalMultiplier, weekendMultiplier, timeMultiplier, timeOfDayMultiplier, microFluctuation, finalPrice);
         
         return finalPrice.setScale(2, RoundingMode.HALF_UP);
     }
@@ -267,13 +306,17 @@ public class DynamicPricingService {
      * - Flight ID (consistent per flight but different across flights)
      * - Market volatility simulation
      */
-    private BigDecimal calculateMicroFluctuation(Long flightId) {
-        // Use current time in seconds to create fluctuation that changes over time
-        long currentTimeSeconds = System.currentTimeMillis() / 1000;
+    private BigDecimal calculateMicroFluctuation(Long flightId, Long offerId) {
+        // Use current time in milliseconds to create fluctuation that changes frequently
+        long currentTimeMillis = System.currentTimeMillis();
         
-        // Create a pseudo-random seed that changes every ~30 seconds
-        // This ensures prices fluctuate but not TOO rapidly
-        long seed = (currentTimeSeconds / 30) + flightId;
+        // Create a pseudo-random seed that includes offer-specific entropy
+        // This ensures each offer instance gets a unique price even for the same flight
+        long seed = currentTimeMillis + flightId;
+        if (offerId != null) {
+            // When offer ID is available, use it to make each offer truly unique
+            seed = seed * 1000 + offerId;
+        }
         java.util.Random random = new java.util.Random(seed);
         
         // Generate fluctuation between -2.00 and +2.00

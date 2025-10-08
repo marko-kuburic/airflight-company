@@ -54,6 +54,9 @@ public class Ticket {
     @JoinColumn(name = "cabin_class_id")
     private CabinClass cabinClass;
     
+    @Column(name = "cabin_class_name")
+    private String cabinClassName; // Denormalized for easy access (ECONOMY, BUSINESS, FIRST)
+    
     @Column(name = "seat_premium")
     private BigDecimal seatPremium; // Extra charge for premium seat
     
@@ -138,6 +141,14 @@ public class Ticket {
     
     public void setCabinClass(CabinClass cabinClass) {
         this.cabinClass = cabinClass;
+    }
+    
+    public String getCabinClassName() {
+        return cabinClassName;
+    }
+    
+    public void setCabinClassName(String cabinClassName) {
+        this.cabinClassName = cabinClassName;
     }
     
     public BigDecimal getSeatPremium() {

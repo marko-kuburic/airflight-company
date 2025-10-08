@@ -297,10 +297,11 @@ public class BookingService {
                 ticketPrice = offer.getLowestFarePrice();
             }
             
-            // Create ticket
+            // Create ticket with standard price
             Ticket ticket = new Ticket(ticketPrice, reservation, passenger);
             ticket.setSeatNumber(ticketDto.getSeatNumber());
             ticket.setCabinClass(cabinClass);
+            ticket.setCabinClassName(cabinClass.getName()); // Store denormalized cabin class name
             ticket.setStatus(Ticket.TicketStatus.CREATED);
             
             // Set seat premium if provided
@@ -431,26 +432,20 @@ public class BookingService {
         // Calculate refund amount (price of this specific ticket)
         BigDecimal refundAmount = ticket.getPrice();
         
-        // Create refund payment record
-        Payment refundPayment = new Payment();
-        refundPayment.setReservation(reservation);
-        refundPayment.setAmount(refundAmount.negate()); // Negative amount for refund
-        refundPayment.setMethod(originalPayment.getMethod());
-        refundPayment.setStatus(Payment.PaymentStatus.REFUNDED);
-        refundPayment.setTransactionId(generateTransactionId());
+        // Update original payment to REFUNDED status
+        originalPayment.setStatus(Payment.PaymentStatus.REFUNDED);
+        paymentRepository.save(originalPayment);
+        logger.info("Updated payment status to REFUNDED for reservation {}", reservation.getId());
         
         // If loyalty points were used in original payment, calculate proportional return
         if (originalPayment.getLoyaltyPointsUsed() > 0) {
             int totalTickets = reservation.getTickets().size();
             int pointsToReturn = originalPayment.getLoyaltyPointsUsed() / totalTickets;
-            refundPayment.setLoyaltyPointsUsed(pointsToReturn);
             
             // Return the loyalty points
             loyaltyService.addPoints(reservation.getCustomer().getId(), pointsToReturn);
             logger.info("Returned {} loyalty points to customer", pointsToReturn);
         }
-        
-        paymentRepository.save(refundPayment);
         
         // Update ticket status
         ticket.setStatus(Ticket.TicketStatus.CANCELLED);
