@@ -44,4 +44,7 @@ package-lock.json
 .npm
 .yarn-integrity
 
+# Frontend build files
+frontend/build/
+
 .config/
