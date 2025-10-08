@@ -137,6 +137,10 @@ export const bookingAPI = {
     api.get(`/bookings/reservations/${reservationId}/tickets`),
   updateTicketStatus: (ticketId, status) => 
     api.patch(`/bookings/tickets/${ticketId}/status`, null, { params: { status } }),
+  
+  // Cancel ticket (Business class only)
+  cancelTicket: (ticketId) => 
+    api.delete(`/bookings/tickets/${ticketId}/cancel`),
 };
 
 export const passengerAPI = {

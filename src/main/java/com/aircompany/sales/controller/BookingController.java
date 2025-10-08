@@ -285,11 +285,15 @@ public class BookingController {
     @GetMapping("/tickets/customer/{customerId}")
     @Transactional(readOnly = true)
     public ResponseEntity<?> getTicketsByCustomer(@PathVariable Long customerId) {
+        logger.info("=== FETCHING TICKETS FOR CUSTOMER {} ===", customerId);
         List<Ticket> tickets = ticketRepository.findByReservation_Customer_Id(customerId);
+        logger.info("Found {} tickets for customer {}", tickets.size(), customerId);
 
         // Convert to DTOs with joined reservation/flight data
         List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
         for (Ticket ticket : tickets) {
+            logger.info("Processing ticket ID: {}, Seat: {}", ticket.getId(), ticket.getSeatNumber());
+            
             java.util.Map<String, Object> ticketMap = new java.util.HashMap<>();
             ticketMap.put("id", ticket.getId());
             ticketMap.put("price", ticket.getPrice());
@@ -299,12 +303,13 @@ public class BookingController {
             
             // Add cabin class from ticket (not from offer fares)
             if (ticket.getCabinClass() != null) {
-                System.out.println("DEBUG: Ticket " + ticket.getId() + " Seat " + ticket.getSeatNumber() + 
-                                 " cabin_class_id in entity: " + ticket.getCabinClass().getId() + 
-                                 " cabin_class_name: " + ticket.getCabinClass().getName());
+                logger.info("Ticket {} has cabin class: ID={}, Name={}", 
+                    ticket.getId(), 
+                    ticket.getCabinClass().getId(), 
+                    ticket.getCabinClass().getName());
                 ticketMap.put("cabinClass", ticket.getCabinClass().getName());
             } else {
-                System.out.println("DEBUG: Ticket " + ticket.getId() + " has NULL cabin class");
+                logger.warn("Ticket {} has NULL cabin class! Using ECONOMY as fallback", ticket.getId());
                 ticketMap.put("cabinClass", "ECONOMY"); // Default fallback
             }
 
@@ -385,5 +390,66 @@ public class BookingController {
         }
 
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Cancel a ticket (Business class only)
+     * This will:
+     * - Check if ticket is Business class
+     * - Create a refund payment
+     * - Free up the seat
+     * - Delete ticket and reservation from database
+     */
+    @DeleteMapping("/tickets/{ticketId}/cancel")
+    @Transactional
+    public ResponseEntity<?> cancelTicket(@PathVariable Long ticketId) {
+        try {
+            logger.info("Attempting to cancel ticket: {}", ticketId);
+            
+            // Get the ticket
+            Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket not found with ID: " + ticketId));
+            
+            // Check if ticket has Business class cabin
+            if (ticket.getCabinClass() == null || 
+                !ticket.getCabinClass().getName().equalsIgnoreCase("BUSINESS")) {
+                logger.warn("Ticket {} is not Business class, cancellation not allowed", ticketId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(java.util.Map.of(
+                        "success", false,
+                        "message", "Only Business class tickets can be cancelled"
+                    ));
+            }
+            
+            // Check if ticket is already cancelled or refunded
+            if (ticket.getStatus() == Ticket.TicketStatus.CANCELLED || 
+                ticket.getStatus() == Ticket.TicketStatus.REFUNDED) {
+                logger.warn("Ticket {} is already cancelled/refunded", ticketId);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Map.of(
+                        "success", false,
+                        "message", "Ticket is already cancelled"
+                    ));
+            }
+            
+            // Call service method to handle cancellation
+            bookingService.cancelTicket(ticket);
+            
+            logger.info("Successfully cancelled ticket: {}", ticketId);
+            
+            return ResponseEntity.ok(java.util.Map.of(
+                "success", true,
+                "message", "Ticket cancelled successfully. Your refund has been processed.",
+                "refundAmount", ticket.getPrice()
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error cancelling ticket {}: {}", ticketId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of(
+                    "success", false,
+                    "message", "Error cancelling ticket: " + e.getMessage()
+                ));
+        }
     }
 }

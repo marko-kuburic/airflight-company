@@ -404,4 +404,81 @@ public class BookingService {
     private String generateTransactionId() {
         return "TXN-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
+    
+    /**
+     * Cancel a ticket and process refund (Business class only)
+     * This will:
+     * - Create a refund payment
+     * - Return loyalty points if used
+     * - Free up the seat
+     * - Update ticket status to CANCELLED and REFUNDED
+     * - Send notification to customer
+     */
+    @Transactional
+    public void cancelTicket(Ticket ticket) {
+        logger.info("Cancelling ticket ID: {} for seat: {}", ticket.getId(), ticket.getSeatNumber());
+        
+        Reservation reservation = ticket.getReservation();
+        if (reservation == null) {
+            throw new RuntimeException("Reservation not found for ticket");
+        }
+        
+        Payment originalPayment = reservation.getPayment();
+        if (originalPayment == null) {
+            throw new RuntimeException("Payment not found for reservation");
+        }
+        
+        // Calculate refund amount (price of this specific ticket)
+        BigDecimal refundAmount = ticket.getPrice();
+        
+        // Create refund payment record
+        Payment refundPayment = new Payment();
+        refundPayment.setReservation(reservation);
+        refundPayment.setAmount(refundAmount.negate()); // Negative amount for refund
+        refundPayment.setMethod(originalPayment.getMethod());
+        refundPayment.setStatus(Payment.PaymentStatus.REFUNDED);
+        refundPayment.setTransactionId(generateTransactionId());
+        
+        // If loyalty points were used in original payment, calculate proportional return
+        if (originalPayment.getLoyaltyPointsUsed() > 0) {
+            int totalTickets = reservation.getTickets().size();
+            int pointsToReturn = originalPayment.getLoyaltyPointsUsed() / totalTickets;
+            refundPayment.setLoyaltyPointsUsed(pointsToReturn);
+            
+            // Return the loyalty points
+            loyaltyService.addPoints(reservation.getCustomer().getId(), pointsToReturn);
+            logger.info("Returned {} loyalty points to customer", pointsToReturn);
+        }
+        
+        paymentRepository.save(refundPayment);
+        
+        // Update ticket status
+        ticket.setStatus(Ticket.TicketStatus.CANCELLED);
+        ticket.setStatus(Ticket.TicketStatus.REFUNDED);
+        ticketRepository.save(ticket);
+        
+        // Send cancellation notification
+        try {
+            String message = String.format(
+                "Your Business class ticket for flight %s (seat %s) has been cancelled. " +
+                "A refund of €%.2f has been processed and will appear in your account within 3-5 business days.",
+                reservation.getOffer().getFlight().getFlightNumber(),
+                ticket.getSeatNumber(),
+                refundAmount
+            );
+            
+            notificationService.createNotification(
+                reservation.getCustomer().getId(),
+                message,
+                com.aircompany.hr.model.Notification.NotificationType.GENERAL
+            );
+            
+            logger.info("Sent cancellation notification to customer {}", reservation.getCustomer().getId());
+        } catch (Exception e) {
+            logger.error("Failed to send cancellation notification: {}", e.getMessage());
+        }
+        
+        logger.info("Successfully cancelled ticket {} and processed refund of €{}", 
+                   ticket.getId(), refundAmount);
+    }
 }

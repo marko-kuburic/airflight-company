@@ -350,11 +350,73 @@ export function SeatSelection({ onSeatSelect, onPriceChange, flightId }) {
           <div style={{ marginBottom: '4px' }}>
             ✓ Selected seat: <strong>{selectedSeat}</strong>
           </div>
-          <div>
+          <div style={{ marginBottom: '8px' }}>
             {seatData[selectedSeat] === "premium" 
               ? `Premium seat - Additional $${seatPrices[selectedSeat] || 50}` 
               : 'Standard seat - Included in ticket price'
             }
+          </div>
+          
+          {/* Luggage Allowance Visualization */}
+          <div style={{
+            marginTop: '12px',
+            paddingTop: '12px',
+            borderTop: '1px solid #dbeafe'
+          }}>
+            <div style={{ 
+              fontSize: '11px', 
+              fontWeight: '600',
+              color: '#1e3a8a',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Luggage Allowance
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              gap: '16px',
+              alignItems: 'center'
+            }}>
+              {seatData[selectedSeat] === "premium" ? (
+                // Business Class - Checked bag + Handbag
+                <>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span style={{ fontSize: '28px' }}>🧳</span>
+                    <span style={{ fontSize: '10px', color: '#1e40af' }}>Checked Bag</span>
+                    <span style={{ fontSize: '9px', color: '#6b7280' }}>23 kg</span>
+                  </div>
+                  <span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span style={{ fontSize: '28px' }}>👜</span>
+                    <span style={{ fontSize: '10px', color: '#1e40af' }}>Handbag</span>
+                    <span style={{ fontSize: '9px', color: '#6b7280' }}>8 kg</span>
+                  </div>
+                </>
+              ) : (
+                // Economy Class - Handbag only
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <span style={{ fontSize: '28px' }}>👜</span>
+                  <span style={{ fontSize: '10px', color: '#1e40af' }}>Handbag</span>
+                  <span style={{ fontSize: '9px', color: '#6b7280' }}>8 kg</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
