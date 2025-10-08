@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public class FlightResponseDto {
     
     private Long id;
+    private String flightNumber;
     private LocalDateTime depTime;
     private LocalDateTime arrTime;
     private FlightStatus status;
@@ -25,8 +26,9 @@ public class FlightResponseDto {
     // Constructors
     public FlightResponseDto() {}
     
-    public FlightResponseDto(Long id, LocalDateTime depTime, LocalDateTime arrTime, FlightStatus status) {
+    public FlightResponseDto(Long id, String flightNumber, LocalDateTime depTime, LocalDateTime arrTime, FlightStatus status) {
         this.id = id;
+        this.flightNumber = flightNumber;
         this.depTime = depTime;
         this.arrTime = arrTime;
         this.status = status;
@@ -39,6 +41,14 @@ public class FlightResponseDto {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public String getFlightNumber() {
+        return flightNumber;
+    }
+    
+    public void setFlightNumber(String flightNumber) {
+        this.flightNumber = flightNumber;
     }
     
     public LocalDateTime getDepTime() {

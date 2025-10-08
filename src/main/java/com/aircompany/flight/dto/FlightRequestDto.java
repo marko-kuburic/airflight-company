@@ -2,9 +2,13 @@ package com.aircompany.flight.dto;
 
 import com.aircompany.flight.model.Flight.FlightStatus;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
 public class FlightRequestDto {
+    
+    @NotBlank(message = "Flight number is required")
+    private String flightNumber;
     
     @NotNull(message = "Departure time is required")
     private LocalDateTime depTime;
@@ -23,13 +27,22 @@ public class FlightRequestDto {
     // Constructors
     public FlightRequestDto() {}
     
-    public FlightRequestDto(LocalDateTime depTime, LocalDateTime arrTime, FlightStatus status) {
+    public FlightRequestDto(String flightNumber, LocalDateTime depTime, LocalDateTime arrTime, FlightStatus status) {
+        this.flightNumber = flightNumber;
         this.depTime = depTime;
         this.arrTime = arrTime;
         this.status = status;
     }
     
     // Getters and Setters
+    public String getFlightNumber() {
+        return flightNumber;
+    }
+    
+    public void setFlightNumber(String flightNumber) {
+        this.flightNumber = flightNumber;
+    }
+    
     public LocalDateTime getDepTime() {
         return depTime;
     }
