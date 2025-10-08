@@ -12,25 +12,30 @@ const Analytics = () => {
   const [occupancyData, setOccupancyData] = useState(null);
   const [routeData, setRouteData] = useState(null);
   const [loyaltyData, setLoyaltyData] = useState(null);
+  const [seasonalData, setSeasonalData] = useState(null);
+  const [cancellationData, setCancellationData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     fetchAnalyticsData();
-  }, [dateRange]);
+  }, [dateRange, selectedYear]);
 
   const fetchAnalyticsData = async () => {
     setLoading(true);
     try {
-      const [dashboard, financial, occupancy, routes, loyalty] = await Promise.all([
+      const [dashboard, financial, occupancy, routes, loyalty, seasonal, cancellation] = await Promise.all([
         analyticsAPI.getDashboardSummary(),
         analyticsAPI.getFinancialIndicators(null, dateRange.startDate, dateRange.endDate),
         analyticsAPI.getOccupancyByCabinClass(null, dateRange.startDate, dateRange.endDate),
         analyticsAPI.getRoutePerformance(null, dateRange.startDate, dateRange.endDate),
-        analyticsAPI.getLoyaltyStatistics()
+        analyticsAPI.getLoyaltyStatistics(),
+        analyticsAPI.getOccupancyBySeason(selectedYear),
+        analyticsAPI.getCancellationRate(dateRange.startDate, dateRange.endDate)
       ]);
 
       setDashboardData(dashboard.data);
@@ -38,6 +43,8 @@ const Analytics = () => {
       setOccupancyData(occupancy.data);
       setRouteData(routes.data);
       setLoyaltyData(loyalty.data);
+      setSeasonalData(seasonal.data);
+      setCancellationData(cancellation.data);
       
       toast.success('Analytics data loaded successfully');
     } catch (error) {
@@ -216,6 +223,119 @@ const Analytics = () => {
             </div>
           </div>
 
+          {/* Seasonal Occupancy Analysis */}
+          <div className="analytics-section">
+            <h2>🌍 Seasonal Occupancy Analysis</h2>
+            <div className="season-controls">
+              <label>
+                Year:
+                <select 
+                  value={selectedYear} 
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                >
+                  <option value={2024}>2024</option>
+                  <option value={2025}>2025</option>
+                  <option value={2026}>2026</option>
+                </select>
+              </label>
+            </div>
+            <div className="seasonal-grid">
+              {seasonalData?.seasonalStats?.map((season, index) => {
+                const getSeasonIcon = (seasonName) => {
+                  switch(seasonName) {
+                    case 'Winter': return '❄️';
+                    case 'Spring': return '🌸';
+                    case 'Summer': return '☀️';
+                    case 'Autumn': return '🍂';
+                    default: return '🌍';
+                  }
+                };
+                
+                return (
+                  <div key={index} className="season-card">
+                    <h3>
+                      {getSeasonIcon(season.season)} {season.season}
+                    </h3>
+                    <div className="season-stats">
+                      <div className="stat-row">
+                        <span>Tickets Sold:</span>
+                        <strong>{season.ticketsSold?.toLocaleString() || '0'}</strong>
+                      </div>
+                      <div className="stat-row">
+                        <span>Revenue:</span>
+                        <strong>${season.totalRevenue?.toLocaleString() || '0'}</strong>
+                      </div>
+                      <div className="stat-row">
+                        <span>Avg. Price:</span>
+                        <strong>${season.averageTicketPrice?.toFixed(2) || '0.00'}</strong>
+                      </div>
+                      <div className="occupancy-indicator">
+                        <div className="occupancy-bar-small">
+                          <div 
+                            className="occupancy-fill-small"
+                            style={{ width: `${season.occupancyRate || 0}%` }}
+                          ></div>
+                        </div>
+                        <span>{season.occupancyRate || 0}% Occupancy</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cancellation Rate Statistics */}
+          <div className="analytics-section">
+            <h2>📊 Cancellation Rate Analysis</h2>
+            <div className="cancellation-overview">
+              <div className="cancellation-metrics">
+                <div className="cancellation-metric">
+                  <div className="metric-icon">📋</div>
+                  <div className="metric-content">
+                    <div className="metric-label">Total Tickets Issued</div>
+                    <div className="metric-value">
+                      {cancellationData?.totalTickets?.toLocaleString() || '0'}
+                    </div>
+                  </div>
+                </div>
+                <div className="cancellation-metric">
+                  <div className="metric-icon">❌</div>
+                  <div className="metric-content">
+                    <div className="metric-label">Cancelled Tickets</div>
+                    <div className="metric-value">
+                      {cancellationData?.cancelledTickets?.toLocaleString() || '0'}
+                    </div>
+                  </div>
+                </div>
+                <div className="cancellation-metric">
+                  <div className="metric-icon">📈</div>
+                  <div className="metric-content">
+                    <div className="metric-label">Cancellation Rate</div>
+                    <div className="metric-value highlight">
+                      {cancellationData?.cancellationRate?.toFixed(2) || '0.00'}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {cancellationData?.cancellationReasons && 
+               Object.keys(cancellationData.cancellationReasons).length > 0 && (
+                <div className="cancellation-reasons">
+                  <h3>Cancellation Reasons</h3>
+                  <div className="reasons-list">
+                    {Object.entries(cancellationData.cancellationReasons).map(([reason, count]) => (
+                      <div key={reason} className="reason-item">
+                        <span className="reason-text">{reason || 'Not Specified'}</span>
+                        <span className="reason-count">{count} tickets</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Loyalty Program Statistics */}
           <div className="analytics-section">
             <h2>🎁 Loyalty Program Insights</h2>
@@ -236,33 +356,6 @@ const Analytics = () => {
                       <span className="tier-count">{count} members</span>
                     </div>
                   ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Booking Trends Chart Placeholder */}
-          <div className="analytics-section">
-            <h2>📈 Booking Trends</h2>
-            <div className="chart-placeholder">
-              <div className="placeholder-content">
-                <div className="trend-stats">
-                  <div className="trend-item">
-                    <span className="trend-label">Peak Booking Day</span>
-                    <span className="trend-value">Friday</span>
-                  </div>
-                  <div className="trend-item">
-                    <span className="trend-label">Average Daily Bookings</span>
-                    <span className="trend-value">
-                      {Math.round((financialData?.totalTicketsSold || 0) / 30)}
-                    </span>
-                  </div>
-                  <div className="trend-item">
-                    <span className="trend-label">Busiest Route</span>
-                    <span className="trend-value">
-                      {routeData?.routePerformance?.[0]?.routeName?.split(' - ')?.[0] || 'N/A'}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>

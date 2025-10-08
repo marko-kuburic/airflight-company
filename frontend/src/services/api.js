@@ -141,6 +141,10 @@ export const bookingAPI = {
   // Cancel ticket (Business class only)
   cancelTicket: (ticketId) => 
     api.delete(`/bookings/tickets/${ticketId}/cancel`),
+  
+  // Complete ticket and award loyalty points
+  completeTicket: (ticketId) =>
+    api.post(`/tickets/${ticketId}/complete`),
 };
 
 export const passengerAPI = {
@@ -163,6 +167,10 @@ export const analyticsAPI = {
     api.get('/analytics/financial', { params: { flightId, startDate, endDate } }),
   getOccupancyByCabinClass: (flightId, startDate, endDate) => 
     api.get('/analytics/occupancy/cabin-class', { params: { flightId, startDate, endDate } }),
+  getOccupancyBySeason: (year) => 
+    api.get('/analytics/occupancy/season', { params: { year } }),
+  getCancellationRate: (startDate, endDate, reason) => 
+    api.get('/analytics/cancellation-rate', { params: { startDate, endDate, reason } }),
   getRoutePerformance: (routeId, startDate, endDate) => 
     api.get('/analytics/routes/performance', { params: { routeId, startDate, endDate } }),
   getLoyaltyStatistics: () => api.get('/analytics/loyalty'),

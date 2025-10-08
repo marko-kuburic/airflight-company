@@ -33,22 +33,32 @@ public class AnalyticsService {
     public Map<String, Object> getOccupancyByCabinClass(Long flightId, LocalDate startDate, LocalDate endDate) {
         logger.info("Getting occupancy by cabin class for flight: {}, period: {} to {}", flightId, startDate, endDate);
         
-        // Simplified query to improve performance
+        // Query to get sold seats per cabin class using the denormalized cabin_class_name field
         StringBuilder jpql = new StringBuilder(
-            "SELECT 'Economy' as cabinClass, " +
-            "COUNT(t.id) as soldSeats, " +
-            "300 as totalCapacity " +
+            "SELECT t.cabinClassName as cabinClass, " +
+            "COUNT(t.id) as soldSeats " +
             "FROM Ticket t " +
             "JOIN t.reservation r " +
             "WHERE t.status IN ('CONFIRMED', 'USED') " +
-            "AND r.status != 'CANCELLED' "
+            "AND r.status != 'CANCELLED' " +
+            "AND t.cabinClassName IS NOT NULL "
         );
+        
+        if (flightId != null) {
+            jpql.append("AND r.offer.flight.id = :flightId ");
+        }
         
         if (startDate != null && endDate != null) {
             jpql.append("AND DATE(t.createdAt) BETWEEN :startDate AND :endDate ");
         }
         
+        jpql.append("GROUP BY t.cabinClassName");
+        
         TypedQuery<Object[]> query = entityManager.createQuery(jpql.toString(), Object[].class);
+        
+        if (flightId != null) {
+            query.setParameter("flightId", flightId);
+        }
         
         if (startDate != null && endDate != null) {
             query.setParameter("startDate", startDate);
@@ -57,23 +67,54 @@ public class AnalyticsService {
         
         List<Object[]> results = query.getResultList();
         
+        // Define total capacity per cabin class (only Business and Economy)
+        Map<String, Integer> capacityMap = new HashMap<>();
+        capacityMap.put("ECONOMY", 300);
+        capacityMap.put("BUSINESS", 50);
+        
+        // Create a map to store sold seats per cabin class
+        Map<String, Long> soldSeatsMap = new HashMap<>();
+        for (Object[] result : results) {
+            String cabinClass = ((String) result[0]).toUpperCase();
+            Long soldSeats = (Long) result[1];
+            soldSeatsMap.put(cabinClass, soldSeats);
+        }
+        
         Map<String, Object> response = new HashMap<>();
         List<Map<String, Object>> cabinStats = new ArrayList<>();
         
-        for (Object[] result : results) {
-            Map<String, Object> stat = new HashMap<>();
-            stat.put("cabinClass", result[0]);
-            stat.put("soldSeats", result[1]);
-            stat.put("totalCapacity", result[2]);
+        // Always include both Economy and Business, even if no tickets sold
+        for (Map.Entry<String, Integer> entry : capacityMap.entrySet()) {
+            String cabinClass = entry.getKey();
+            Integer totalCapacity = entry.getValue();
+            Long soldSeats = soldSeatsMap.getOrDefault(cabinClass, 0L);
             
-            Long soldSeats = (Long) result[1];
-            Integer totalCapacity = (Integer) result[2];
+            Map<String, Object> stat = new HashMap<>();
+            stat.put("cabinClass", cabinClass.substring(0, 1).toUpperCase() + cabinClass.substring(1).toLowerCase());
+            stat.put("soldSeats", soldSeats);
+            stat.put("totalCapacity", totalCapacity);
             
             Double occupancyRate = totalCapacity > 0 ? 
                 (soldSeats.doubleValue() / totalCapacity.doubleValue()) * 100 : 0.0;
             stat.put("occupancyRate", Math.round(occupancyRate * 100.0) / 100.0);
             
             cabinStats.add(stat);
+        }
+        
+        // Add cabin classes with 0 sold seats
+        for (String cabinClass : capacityMap.keySet()) {
+            boolean found = cabinStats.stream()
+                .anyMatch(stat -> stat.get("cabinClass").toString().equalsIgnoreCase(cabinClass));
+            
+            if (!found) {
+                Map<String, Object> stat = new HashMap<>();
+                stat.put("cabinClass", cabinClass.substring(0, 1) + cabinClass.substring(1).toLowerCase()); // Capitalize
+                stat.put("soldSeats", 0L);
+                stat.put("totalCapacity", capacityMap.get(cabinClass));
+                stat.put("occupancyRate", 0.0);
+                
+                cabinStats.add(stat);
+            }
         }
         
         response.put("cabinClassStats", cabinStats);
@@ -116,13 +157,13 @@ public class AnalyticsService {
     public Map<String, Object> getCancellationRate(LocalDate startDate, LocalDate endDate, String reason) {
         logger.info("Getting cancellation rate for period: {} to {}", startDate, endDate);
         
-        // Total reservations
+        // Total tickets issued
         StringBuilder totalJpql = new StringBuilder(
-            "SELECT COUNT(r) FROM Reservation r WHERE 1=1 "
+            "SELECT COUNT(t) FROM Ticket t WHERE 1=1 "
         );
         
         if (startDate != null && endDate != null) {
-            totalJpql.append("AND DATE(r.createdAt) BETWEEN :startDate AND :endDate ");
+            totalJpql.append("AND DATE(t.createdAt) BETWEEN :startDate AND :endDate ");
         }
         
         TypedQuery<Long> totalQuery = entityManager.createQuery(totalJpql.toString(), Long.class);
@@ -131,15 +172,15 @@ public class AnalyticsService {
             totalQuery.setParameter("endDate", endDate);
         }
         
-        Long totalReservations = totalQuery.getSingleResult();
+        Long totalTickets = totalQuery.getSingleResult();
         
-        // Cancelled reservations
+        // Cancelled tickets (status = CANCELLED or REFUNDED)
         StringBuilder cancelledJpql = new StringBuilder(
-            "SELECT COUNT(r) FROM Reservation r WHERE r.status = 'CANCELLED' "
+            "SELECT COUNT(t) FROM Ticket t WHERE (t.status = 'CANCELLED' OR t.status = 'REFUNDED') "
         );
         
         if (startDate != null && endDate != null) {
-            cancelledJpql.append("AND DATE(r.createdAt) BETWEEN :startDate AND :endDate ");
+            cancelledJpql.append("AND DATE(t.createdAt) BETWEEN :startDate AND :endDate ");
         }
         
         TypedQuery<Long> cancelledQuery = entityManager.createQuery(cancelledJpql.toString(), Long.class);
@@ -148,17 +189,21 @@ public class AnalyticsService {
             cancelledQuery.setParameter("endDate", endDate);
         }
         
-        Long cancelledReservations = cancelledQuery.getSingleResult();
+        Long cancelledTickets = cancelledQuery.getSingleResult();
         
-        Double cancellationRate = totalReservations > 0 ? 
-            (cancelledReservations.doubleValue() / totalReservations.doubleValue()) * 100 : 0.0;
+        Double cancellationRate = totalTickets > 0 ? 
+            (cancelledTickets.doubleValue() / totalTickets.doubleValue()) * 100 : 0.0;
         
         Map<String, Object> response = new HashMap<>();
-        response.put("totalReservations", totalReservations);
-        response.put("cancelledReservations", cancelledReservations);
+        response.put("totalTickets", totalTickets);
+        response.put("cancelledTickets", cancelledTickets);
         response.put("cancellationRate", Math.round(cancellationRate * 100.0) / 100.0);
         response.put("period", Map.of("startDate", startDate, "endDate", endDate));
         response.put("generatedAt", LocalDateTime.now());
+        
+        // Optional: Get cancellation reasons if available (from a hypothetical cancellation_reasons field)
+        // For now, return empty map as we don't have a cancellation reason field
+        response.put("cancellationReasons", new HashMap<>());
         
         return response;
     }
@@ -393,9 +438,44 @@ public class AnalyticsService {
         Map<String, Object> occupancyData = getOccupancyByCabinClass(null, startDate, endDate);
         Map<String, Object> seasonData = new HashMap<>();
         
+        // Calculate aggregate stats for the season
+        String jpql = "SELECT COUNT(t), SUM(t.price), AVG(t.price) FROM Ticket t " +
+                     "JOIN t.reservation r " +
+                     "WHERE t.status IN ('CONFIRMED', 'USED') " +
+                     "AND r.status != 'CANCELLED' " +
+                     "AND DATE(t.createdAt) BETWEEN :startDate AND :endDate";
+        
+        jakarta.persistence.Query query = entityManager.createQuery(jpql);
+        query.setParameter("startDate", startDate);
+        query.setParameter("endDate", endDate);
+        
+        Object[] result = (Object[]) query.getSingleResult();
+        Long ticketsSold = (Long) result[0];
+        Double totalRevenue = result[1] != null ? ((Number) result[1]).doubleValue() : 0.0;
+        Double avgPrice = result[2] != null ? ((Number) result[2]).doubleValue() : 0.0;
+        
+        // Calculate overall occupancy rate from cabin class data
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> cabinStats = (List<Map<String, Object>>) occupancyData.get("cabinClassStats");
+        double totalSoldSeats = 0;
+        double totalCapacity = 0;
+        
+        if (cabinStats != null) {
+            for (Map<String, Object> stat : cabinStats) {
+                totalSoldSeats += ((Number) stat.get("soldSeats")).doubleValue();
+                totalCapacity += ((Number) stat.get("totalCapacity")).doubleValue();
+            }
+        }
+        
+        double occupancyRate = totalCapacity > 0 ? (totalSoldSeats / totalCapacity) * 100 : 0.0;
+        
         seasonData.put("season", seasonName);
         seasonData.put("startDate", startDate);
         seasonData.put("endDate", endDate);
+        seasonData.put("ticketsSold", ticketsSold);
+        seasonData.put("totalRevenue", totalRevenue);
+        seasonData.put("averageTicketPrice", avgPrice);
+        seasonData.put("occupancyRate", Math.round(occupancyRate * 100.0) / 100.0);
         seasonData.put("occupancyData", occupancyData);
         
         return seasonData;

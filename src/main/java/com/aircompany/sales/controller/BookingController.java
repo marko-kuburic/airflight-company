@@ -301,15 +301,13 @@ public class BookingController {
             ticketMap.put("seatNumber", ticket.getSeatNumber());
             ticketMap.put("createdAt", ticket.getCreatedAt());
             
-            // Add cabin class from ticket (not from offer fares)
-            if (ticket.getCabinClass() != null) {
-                logger.info("Ticket {} has cabin class: ID={}, Name={}", 
-                    ticket.getId(), 
-                    ticket.getCabinClass().getId(), 
-                    ticket.getCabinClass().getName());
-                ticketMap.put("cabinClass", ticket.getCabinClass().getName());
+            // Use denormalized cabin class name stored directly on ticket
+            String cabinClassName = ticket.getCabinClassName();
+            if (cabinClassName != null && !cabinClassName.isEmpty()) {
+                logger.info("Ticket {} has cabin class name: {}", ticket.getId(), cabinClassName);
+                ticketMap.put("cabinClass", cabinClassName);
             } else {
-                logger.warn("Ticket {} has NULL cabin class! Using ECONOMY as fallback", ticket.getId());
+                logger.warn("Ticket {} has NULL/empty cabin class name! Using ECONOMY as fallback", ticket.getId());
                 ticketMap.put("cabinClass", "ECONOMY"); // Default fallback
             }
 
@@ -410,10 +408,11 @@ public class BookingController {
             Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Ticket not found with ID: " + ticketId));
             
-            // Check if ticket has Business class cabin
-            if (ticket.getCabinClass() == null || 
-                !ticket.getCabinClass().getName().equalsIgnoreCase("BUSINESS")) {
-                logger.warn("Ticket {} is not Business class, cancellation not allowed", ticketId);
+            // Check if ticket has Business class cabin using denormalized field
+            String cabinClassName = ticket.getCabinClassName();
+            if (cabinClassName == null || !cabinClassName.equalsIgnoreCase("BUSINESS")) {
+                logger.warn("Ticket {} is not Business class (class: {}), cancellation not allowed", 
+                    ticketId, cabinClassName);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(java.util.Map.of(
                         "success", false,

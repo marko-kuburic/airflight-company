@@ -51,7 +51,7 @@ public class OfferController {
      */
     @GetMapping("/flight/{flightId}")
     public ResponseEntity<List<Offer>> getOffersByFlight(@PathVariable Long flightId) {
-        List<Offer> offers = offerRepository.findByFlightId(flightId);
+        List<Offer> offers = offerRepository.findByFlightId(flightId, LocalDateTime.now());
         return ResponseEntity.ok(offers);
     }
     
@@ -60,7 +60,7 @@ public class OfferController {
      */
     @GetMapping("/search")
     public ResponseEntity<List<Offer>> searchOffers(@RequestParam String query) {
-        List<Offer> offers = offerRepository.searchByTitle(query);
+        List<Offer> offers = offerRepository.searchByTitle(query, LocalDateTime.now());
         return ResponseEntity.ok(offers);
     }
     

@@ -25,22 +25,72 @@ export default function MyTickets() {
           const response = await bookingAPI.getTicketsByCustomer(userData.id);
           console.log('Backend tickets response:', response.data);
           
+          // Helper function to complete ticket on backend
+          const completeTicketOnBackend = async (ticketId, flightNumber, distance) => {
+            try {
+              await bookingAPI.completeTicket(ticketId);
+              const loyaltyPoints = Math.floor(distance);
+              
+              // Show toast popup (temporary visual notification)
+              toast.success(
+                `Flight ${flightNumber} completed! You traveled ${loyaltyPoints.toLocaleString()} km and earned ${loyaltyPoints.toLocaleString()} loyalty points. ✈️`,
+                {
+                  duration: 30000, // 30 seconds
+                  icon: '🎉'
+                }
+              );
+            } catch (error) {
+              console.error('Error completing ticket on backend:', error);
+            }
+          };
+          
           // Transform tickets to display format
-          const backendTickets = response.data.map(ticket => ({
-            id: ticket.id,
-            reservationNumber: ticket.reservation?.reservationNumber || 'N/A',
-            flightNumber: ticket.flight?.flightNumber || 'N/A',
-            route: ticket.flight?.route || 'N/A',
-            date: ticket.flight?.departureTime ? 
-              new Date(ticket.flight.departureTime).toISOString().split('T')[0] : 
-              new Date().toISOString().split('T')[0],
-            class: ticket.cabinClass || 'Economy',
-            status: ticket.status || 'Confirmed',
-            passengerName: ticket.passenger ? `${ticket.passenger.firstName || ''} ${ticket.passenger.lastName || ''}`.trim() : 'N/A',
-            totalAmount: ticket.reservation?.payment?.amount || ticket.totalAmount || ticket.price || 'N/A',
-            seat: ticket.seatNumber || 'N/A',
-            email: ticket.passenger?.email || 'N/A'
-          }));
+          const backendTickets = response.data.map(ticket => {
+            // Backend returns flight info directly in ticket.flight
+            const flight = ticket.flight;
+            
+            // Check if departure date is in the past - auto-update status to USED
+            let ticketStatus = ticket.status || 'Confirmed';
+            let shouldRewardPoints = false;
+            
+            if (flight?.departureTime && ticketStatus === 'CONFIRMED') {
+              const departureDate = new Date(flight.departureTime);
+              const now = new Date();
+              if (departureDate < now) {
+                ticketStatus = 'USED';
+                shouldRewardPoints = true; // Mark for rewarding points
+              }
+            }
+            
+            const mappedTicket = {
+              id: ticket.id,
+              reservationNumber: ticket.reservation?.reservationNumber || 'N/A',
+              flightNumber: flight?.flightNumber || 'N/A',
+              route: flight?.route || 'N/A', // Backend returns route as string, not object
+              date: flight?.departureTime ? 
+                new Date(flight.departureTime).toISOString().split('T')[0] : 
+                new Date().toISOString().split('T')[0],
+              departureTime: flight?.departureTime || null, // Add for PDF generation
+              arrivalTime: flight?.arrivalTime || null,     // Add for PDF generation
+              distance: flight?.distance || 0, // Distance in km for loyalty points
+              class: ticket.cabinClass || 'Economy',  // This comes directly from ticket now!
+              status: ticketStatus,
+              passengerName: ticket.passenger ? `${ticket.passenger.firstName || ''} ${ticket.passenger.lastName || ''}`.trim() : 'N/A',
+              totalAmount: ticket.reservation?.payment?.amount || ticket.totalAmount || ticket.price || 'N/A',
+              seat: ticket.seatNumber || 'N/A',
+              email: ticket.passenger?.email || 'N/A',
+              shouldRewardPoints // Flag for backend call
+            };
+            
+            // If we just marked this flight as completed, call backend to save permanent notification
+            if (shouldRewardPoints) {
+              // Call backend asynchronously (don't wait for response)
+              const distance = flight?.distance || 0;
+              completeTicketOnBackend(ticket.id, flight?.flightNumber, distance);
+            }
+            
+            return mappedTicket;
+          });
           
           console.log('Mapped backend tickets:', backendTickets);
           allTickets = [...backendTickets];
@@ -166,7 +216,9 @@ export default function MyTickets() {
       border: '1px solid'
     };
 
-    switch (status) {
+    const upperStatus = status?.toUpperCase();
+    
+    switch (upperStatus) {
       case 'CREATED':
         return {
           ...baseStyle,
@@ -182,6 +234,7 @@ export default function MyTickets() {
           borderColor: '#10b981'
         };
       case 'CANCELLED':
+      case 'REFUNDED':
         return {
           ...baseStyle,
           backgroundColor: '#fee2e2',
@@ -194,6 +247,13 @@ export default function MyTickets() {
           backgroundColor: '#e0e7ff',
           color: '#3730a3',
           borderColor: '#6366f1'
+        };
+      case 'EXPIRED':
+        return {
+          ...baseStyle,
+          backgroundColor: '#f3f4f6',
+          color: '#6b7280',
+          borderColor: '#9ca3af'
         };
       default:
         return baseStyle;
@@ -244,7 +304,7 @@ export default function MyTickets() {
       color: 'white'
     };
 
-    if (ticket.status === 'Confirmed') {
+    if (ticket.status === 'Confirmed' || ticket.status === 'CONFIRMED') {
       return (
         <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', width: '100%', alignItems: 'center' }}>
           <button 
@@ -267,7 +327,7 @@ export default function MyTickets() {
           </button>
         </div>
       );
-    } else if (ticket.status === 'Created') {
+    } else if (ticket.status === 'Created' || ticket.status === 'CREATED') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <button 
@@ -278,6 +338,18 @@ export default function MyTickets() {
           >
             Cancel
           </button>
+        </div>
+      );
+    } else if (ticket.status === 'USED') {
+      // Show used status - no actions available
+      return (
+        <div style={{ 
+          fontSize: '12px', 
+          color: '#6b7280',
+          fontStyle: 'italic',
+          padding: '8px'
+        }}>
+          Flight completed
         </div>
       );
     }
@@ -327,8 +399,14 @@ export default function MyTickets() {
         flightDetails: {
           flightNumber: ticket.flightNumber,
           route: ticket.route,
-          departure: 'N/A', // You might want to add these fields to your ticket data
-          arrival: 'N/A',
+          departure: ticket.departureTime ? new Date(ticket.departureTime).toLocaleString('en-GB', {
+            year: 'numeric', month: 'short', day: '2-digit', 
+            hour: '2-digit', minute: '2-digit'
+          }) : 'N/A',
+          arrival: ticket.arrivalTime ? new Date(ticket.arrivalTime).toLocaleString('en-GB', {
+            year: 'numeric', month: 'short', day: '2-digit', 
+            hour: '2-digit', minute: '2-digit'
+          }) : 'N/A',
           class: ticket.class
         },
         passengerName: ticket.passengerName,
