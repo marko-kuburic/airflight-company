@@ -108,30 +108,6 @@ export const FlightCard = ({ flight, onFlightSelect, onFlightUpdate }) => {
                     </div>
                 </div>
 
-                {/* Cabin classes and prices */}
-                {currentFlight.offers && currentFlight.offers.length > 0 && (
-                    <div className="mb-4 bg-gray-50 rounded-lg p-4">
-                        <div className="text-base font-semibold text-gray-700 mb-3">Available Classes:</div>
-                        <div className="flex flex-wrap gap-3 justify-center">
-                            {currentFlight.offers[0].fares?.map((fare, index) => (
-                                <div key={index} className="flex items-center space-x-3 bg-white rounded-lg px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                                    <span className="text-base font-medium text-gray-700">
-                                        {fare.cabinClass?.name || 'Economy'}
-                                    </span>
-                                    <span className="text-lg font-bold text-blue-600">
-                                        €{fare.price}
-                                    </span>
-                                </div>
-                            )) || (
-                                <div className="flex items-center space-x-2 bg-gray-50 rounded-lg px-3 py-2">
-                                    <span className="text-sm font-medium text-gray-700">Economy</span>
-                                    <span className="text-sm font-bold text-gray-900">€{currentFlight.currentPrice}</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
                 {/* Action button */}
                 <div className="flex justify-end">
                     <button

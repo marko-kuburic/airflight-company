@@ -288,8 +288,33 @@ export default function MyTickets() {
     toast.info('Editing functionality coming soon!');
   };
 
-  const handleCancel = (ticketId) => {
-    toast.info('Cancellation functionality coming soon!');
+  const handleCancel = async (ticketId) => {
+    // Confirm with user before cancelling
+    if (!window.confirm('Are you sure you want to cancel this Business class ticket? A refund will be processed.')) {
+      return;
+    }
+
+    try {
+      const response = await bookingAPI.cancelTicket(ticketId);
+      
+      if (response.data.success) {
+        toast.success(`${response.data.message} Refund amount: €${response.data.refundAmount}`, {
+          duration: 5000,
+          icon: '✅'
+        });
+        
+        // Reload tickets to show updated status
+        await loadTickets();
+      } else {
+        toast.error(response.data.message || 'Failed to cancel ticket');
+      }
+    } catch (error) {
+      console.error('Error cancelling ticket:', error);
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data || 
+                          'Failed to cancel ticket. Please try again.';
+      toast.error(errorMessage);
+    }
   };
 
   const handleDownloadTicket = (ticket) => {
@@ -463,6 +488,29 @@ export default function MyTickets() {
                   >
                     🎫 Boarding Pass
                   </button>
+                  {/* Show cancel button only for Business class confirmed tickets */}
+                  {ticket.class && ticket.class.toUpperCase() === 'BUSINESS' && 
+                   ticket.status === 'CONFIRMED' && (
+                    <button 
+                      style={{
+                        backgroundColor: '#dc2626', 
+                        color: 'white', 
+                        padding: '8px 12px', 
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                      onClick={() => handleCancel(ticket.id)}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#b91c1c'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#dc2626'}
+                      title="Cancel Business Class Ticket & Get Refund"
+                    >
+                      ❌ Cancel Ticket
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

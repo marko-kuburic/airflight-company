@@ -164,12 +164,17 @@ export function PaymentMethodSelector({ onPaymentChange, totalAmount = 0, loyalt
     
     const discount = limitedPoints / 100; // 100 points = $1
     
+    // Calculate if points are sufficient for full payment (only for 'loyalty' method)
+    const pointsNeededForFullPayment = Math.ceil(totalAmount * 100);
+    const isSufficientForLoyaltyOnly = limitedPoints >= pointsNeededForFullPayment;
+    
     if (onPaymentChange) {
       onPaymentChange({ 
         method: selectedMethod, 
         cardDetails, 
         loyaltyPoints: limitedValue,
-        loyaltyDiscount: discount 
+        loyaltyDiscount: discount,
+        isSufficientForLoyaltyOnly: isSufficientForLoyaltyOnly
       });
     }
   };
@@ -379,18 +384,65 @@ export function PaymentMethodSelector({ onPaymentChange, totalAmount = 0, loyalt
             </div>
             {maxLoyaltyPoints < loyaltyBalance && (
               <div style={{ fontSize: '12px', color: '#ca8a04', marginTop: '4px' }}>
-                ⚠️ Max {maxLoyaltyPoints.toLocaleString()} points ({((maxLoyaltyPoints / 100).toFixed(2))}€) can be used for this purchase
+                ⚠️ Max {maxLoyaltyPoints.toLocaleString()} points (€{(maxLoyaltyPoints / 100).toFixed(2)}) can be used for this purchase
               </div>
             )}
           </div>
           
-          <label style={labelStyle}>Points to use (max: {maxLoyaltyPoints.toLocaleString()})</label>
+          {selectedMethod === 'loyalty' && (
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: '#eff6ff', 
+              borderRadius: '6px', 
+              border: '1px solid #93c5fd',
+              marginBottom: '12px'
+            }}>
+              <div style={{ fontSize: '13px', color: '#1e40af', fontWeight: '500' }}>
+                ℹ️ Loyalty Points Only Payment
+              </div>
+              <div style={{ fontSize: '12px', color: '#1e40af', marginTop: '4px' }}>
+                You need <strong>{Math.ceil(totalAmount * 100).toLocaleString()} points</strong> (€{totalAmount.toFixed(2)}) to pay the full amount with loyalty points only.
+              </div>
+              {loyaltyBalance < Math.ceil(totalAmount * 100) && (
+                <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', fontWeight: '500' }}>
+                  ⚠️ Insufficient balance! You're short {(Math.ceil(totalAmount * 100) - loyaltyBalance).toLocaleString()} points. Please use "Combined" payment instead.
+                </div>
+              )}
+            </div>
+          )}
+          
+          {selectedMethod === 'combined' && (
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: '#fef3c7', 
+              borderRadius: '6px', 
+              border: '1px solid #fcd34d',
+              marginBottom: '12px'
+            }}>
+              <div style={{ fontSize: '13px', color: '#92400e', fontWeight: '500' }}>
+                💳 Combined Payment
+              </div>
+              <div style={{ fontSize: '12px', color: '#92400e', marginTop: '4px' }}>
+                Use some loyalty points and pay the remaining amount with your card.
+              </div>
+            </div>
+          )}
+          
+          <label style={labelStyle}>
+            {selectedMethod === 'loyalty' 
+              ? `Enter ${Math.ceil(totalAmount * 100).toLocaleString()} points to pay full amount`
+              : `Points to use (max: ${maxLoyaltyPoints.toLocaleString()})`
+            }
+          </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="number"
               value={loyaltyPoints}
               onChange={(e) => handleLoyaltyChange(e.target.value)}
-              placeholder={`e.g. ${Math.min(1000, maxLoyaltyPoints)}`}
+              placeholder={selectedMethod === 'loyalty' 
+                ? Math.ceil(totalAmount * 100).toString()
+                : `e.g. ${Math.min(1000, maxLoyaltyPoints)}`
+              }
               min="0"
               max={maxLoyaltyPoints}
               style={loyaltyInputStyle}
@@ -401,6 +453,19 @@ export function PaymentMethodSelector({ onPaymentChange, totalAmount = 0, loyalt
               </div>
             )}
           </div>
+          {selectedMethod === 'loyalty' && loyaltyPoints > 0 && (
+            <div style={{ marginTop: '8px' }}>
+              {parseInt(loyaltyPoints) >= Math.ceil(totalAmount * 100) ? (
+                <div style={{ fontSize: '12px', color: '#059669', fontWeight: '600' }}>
+                  ✓ Sufficient points to complete payment!
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: '#dc2626', fontWeight: '600' }}>
+                  ✗ Need {(Math.ceil(totalAmount * 100) - parseInt(loyaltyPoints)).toLocaleString()} more points
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

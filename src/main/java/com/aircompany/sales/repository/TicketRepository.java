@@ -80,6 +80,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
            "LEFT JOIN FETCH f.route " +
            "LEFT JOIN FETCH o.fares fare " +
            "LEFT JOIN FETCH fare.cabinClass " +
+           "LEFT JOIN FETCH t.cabinClass " +
            "LEFT JOIN FETCH r.payment " +
            "JOIN FETCH t.passenger " +
            "WHERE r.customer.id = :customerId " +
