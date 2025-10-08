@@ -2,6 +2,7 @@ package com.aircompany.flight.dto;
 
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.LocalTime;
 
 public class SegmentRequestDto {
     
@@ -14,8 +15,12 @@ public class SegmentRequestDto {
     @NotNull(message = "Destination airport ID is required")
     private Long destinationAirportId;
     
-    @NotNull(message = "Distance is required")
+    // Distance will be calculated automatically from airport coordinates
     private BigDecimal distance;
+    
+    private LocalTime departureTime;
+    
+    private LocalTime arrivalTime;
     
     // Constructors
     public SegmentRequestDto() {}
@@ -25,6 +30,15 @@ public class SegmentRequestDto {
         this.originAirportId = originAirportId;
         this.destinationAirportId = destinationAirportId;
         this.distance = distance;
+    }
+    
+    public SegmentRequestDto(Long routeId, Long originAirportId, Long destinationAirportId, BigDecimal distance, LocalTime departureTime, LocalTime arrivalTime) {
+        this.routeId = routeId;
+        this.originAirportId = originAirportId;
+        this.destinationAirportId = destinationAirportId;
+        this.distance = distance;
+        this.departureTime = departureTime;
+        this.arrivalTime = arrivalTime;
     }
     
     // Getters and Setters
@@ -58,5 +72,21 @@ public class SegmentRequestDto {
     
     public void setDistance(BigDecimal distance) {
         this.distance = distance;
+    }
+    
+    public LocalTime getDepartureTime() {
+        return departureTime;
+    }
+    
+    public void setDepartureTime(LocalTime departureTime) {
+        this.departureTime = departureTime;
+    }
+    
+    public LocalTime getArrivalTime() {
+        return arrivalTime;
+    }
+    
+    public void setArrivalTime(LocalTime arrivalTime) {
+        this.arrivalTime = arrivalTime;
     }
 }

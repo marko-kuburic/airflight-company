@@ -8,6 +8,7 @@ import com.aircompany.flight.model.Segment;
 import com.aircompany.flight.repository.AirportRepository;
 import com.aircompany.flight.repository.RouteRepository;
 import com.aircompany.flight.repository.SegmentRepository;
+import com.aircompany.flight.service.RouteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,9 @@ public class SegmentService {
     
     @Autowired
     private AirportRepository airportRepository;
+    
+    @Autowired
+    private RouteService routeService;
     
     public List<SegmentResponseDto> getAllSegments() {
         return segmentRepository.findAll().stream()
@@ -75,13 +79,22 @@ public class SegmentService {
         Airport destinationAirport = airportRepository.findById(requestDto.getDestinationAirportId())
                 .orElseThrow(() -> new IllegalArgumentException("Destination airport with ID " + requestDto.getDestinationAirportId() + " not found"));
         
+        // Calculate distance using Haversine formula
+        BigDecimal calculatedDistance = calculateDistance(
+            originAirport.getLatitude(), originAirport.getLongitude(),
+            destinationAirport.getLatitude(), destinationAirport.getLongitude()
+        );
+        
         Segment segment = new Segment();
         segment.setRoute(route);
         segment.setOriginAirport(originAirport);
         segment.setDestinationAirport(destinationAirport);
-        segment.setDistance(requestDto.getDistance());
+        segment.setDistance(calculatedDistance);
+        segment.setDepartureTime(requestDto.getDepartureTime());
+        segment.setArrivalTime(requestDto.getArrivalTime());
         
         Segment savedSegment = segmentRepository.save(segment);
+        
         return convertToResponseDto(savedSegment);
     }
     
@@ -101,6 +114,8 @@ public class SegmentService {
                     segment.setOriginAirport(originAirport);
                     segment.setDestinationAirport(destinationAirport);
                     segment.setDistance(requestDto.getDistance());
+                    segment.setDepartureTime(requestDto.getDepartureTime());
+                    segment.setArrivalTime(requestDto.getArrivalTime());
                     
                     Segment savedSegment = segmentRepository.save(segment);
                     return convertToResponseDto(savedSegment);
@@ -139,8 +154,31 @@ public class SegmentService {
         responseDto.setDestinationAirportCode(segment.getDestinationAirport().getIataCode());
         responseDto.setDestinationAirportName(segment.getDestinationAirport().getName());
         responseDto.setDistance(segment.getDistance());
+        responseDto.setDepartureTime(segment.getDepartureTime());
+        responseDto.setArrivalTime(segment.getArrivalTime());
         responseDto.setCreatedAt(segment.getCreatedAt());
         responseDto.setModifiedAt(segment.getModifiedAt());
         return responseDto;
+    }
+    
+    /**
+     * Calculate distance between two points using Haversine formula
+     * @param lat1 Latitude of first point
+     * @param lon1 Longitude of first point
+     * @param lat2 Latitude of second point
+     * @param lon2 Longitude of second point
+     * @return Distance in kilometers
+     */
+    private BigDecimal calculateDistance(BigDecimal lat1, BigDecimal lon1, BigDecimal lat2, BigDecimal lon2) {
+        final int EARTH_RADIUS = 6371; // Radius of the earth in km
+        
+        double latDistance = Math.toRadians(lat2.doubleValue() - lat1.doubleValue());
+        double lonDistance = Math.toRadians(lon2.doubleValue() - lon1.doubleValue());
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1.doubleValue())) * Math.cos(Math.toRadians(lat2.doubleValue()))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return BigDecimal.valueOf(EARTH_RADIUS * c).setScale(2, BigDecimal.ROUND_HALF_UP);
     }
 }

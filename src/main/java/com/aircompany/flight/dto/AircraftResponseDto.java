@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public class AircraftResponseDto {
     
     private Long id;
+    private String registration;
     private String model;
     private AircraftStatus status;
     private Integer capacity;
@@ -17,8 +18,9 @@ public class AircraftResponseDto {
     // Constructors
     public AircraftResponseDto() {}
     
-    public AircraftResponseDto(Long id, String model, AircraftStatus status, Integer capacity) {
+    public AircraftResponseDto(Long id, String registration, String model, AircraftStatus status, Integer capacity) {
         this.id = id;
+        this.registration = registration;
         this.model = model;
         this.status = status;
         this.capacity = capacity;
@@ -31,6 +33,14 @@ public class AircraftResponseDto {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public String getRegistration() {
+        return registration;
+    }
+    
+    public void setRegistration(String registration) {
+        this.registration = registration;
     }
     
     public String getModel() {

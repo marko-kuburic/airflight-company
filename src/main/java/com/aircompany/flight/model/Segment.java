@@ -1,7 +1,6 @@
 package com.aircompany.flight.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -9,6 +8,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "segments")
@@ -25,6 +25,12 @@ public class Segment {
     
     @Column(name = "duration_minutes")
     private Integer durationMinutes;
+    
+    @Column(name = "departure_time")
+    private LocalTime departureTime;
+    
+    @Column(name = "arrival_time")
+    private LocalTime arrivalTime;
     
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -56,6 +62,15 @@ public class Segment {
         this.route = route;
     }
     
+    public Segment(Airport originAirport, Airport destinationAirport, BigDecimal distance, Route route, LocalTime departureTime, LocalTime arrivalTime) {
+        this.originAirport = originAirport;
+        this.destinationAirport = destinationAirport;
+        this.distance = distance;
+        this.route = route;
+        this.departureTime = departureTime;
+        this.arrivalTime = arrivalTime;
+    }
+    
     // Getters and Setters
     public Long getId() {
         return id;
@@ -80,6 +95,22 @@ public class Segment {
     
     public void setDurationMinutes(Integer durationMinutes) {
         this.durationMinutes = durationMinutes;
+    }
+    
+    public LocalTime getDepartureTime() {
+        return departureTime;
+    }
+    
+    public void setDepartureTime(LocalTime departureTime) {
+        this.departureTime = departureTime;
+    }
+    
+    public LocalTime getArrivalTime() {
+        return arrivalTime;
+    }
+    
+    public void setArrivalTime(LocalTime arrivalTime) {
+        this.arrivalTime = arrivalTime;
     }
     
     public LocalDateTime getCreatedAt() {

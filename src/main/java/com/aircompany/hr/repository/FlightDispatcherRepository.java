@@ -12,6 +12,8 @@ import java.util.Optional;
 @Repository
 public interface FlightDispatcherRepository extends JpaRepository<FlightDispatcher, Long> {
     
+    Optional<FlightDispatcher> findByEmail(String email);
+    
     List<FlightDispatcher> findByDispatchLicenseContainingIgnoreCase(String license);
     
     List<FlightDispatcher> findByExperienceYearsGreaterThanEqual(Integer minExperience);

@@ -34,6 +34,13 @@ public class AircraftController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
+    @GetMapping("/registration/{registration}")
+    public ResponseEntity<AircraftResponseDto> getAircraftByRegistration(@PathVariable String registration) {
+        Optional<AircraftResponseDto> aircraft = aircraftService.getAircraftByRegistration(registration);
+        return aircraft.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
     @GetMapping("/status/{status}")
     public ResponseEntity<List<AircraftResponseDto>> getAircraftByStatus(@PathVariable AircraftStatus status) {
         List<AircraftResponseDto> aircraft = aircraftService.getAircraftByStatus(status);
@@ -90,6 +97,14 @@ public class AircraftController {
     public ResponseEntity<AircraftResponseDto> updateAircraft(@PathVariable Long id, 
                                                            @Valid @RequestBody AircraftRequestDto requestDto) {
         Optional<AircraftResponseDto> updatedAircraft = aircraftService.updateAircraft(id, requestDto);
+        return updatedAircraft.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PutMapping("/registration/{registration}")
+    public ResponseEntity<AircraftResponseDto> updateAircraftByRegistration(@PathVariable String registration, 
+                                                                             @Valid @RequestBody AircraftRequestDto requestDto) {
+        Optional<AircraftResponseDto> updatedAircraft = aircraftService.updateAircraftByRegistration(registration, requestDto);
         return updatedAircraft.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

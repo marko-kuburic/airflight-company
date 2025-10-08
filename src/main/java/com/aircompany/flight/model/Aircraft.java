@@ -21,6 +21,10 @@ public class Aircraft {
     private Long id;
     
     @NotBlank
+    @Column(name = "registration", nullable = false, unique = true)
+    private String registration;
+    
+    @NotBlank
     @Column(name = "model", nullable = false)
     private String model;
     
@@ -40,8 +44,8 @@ public class Aircraft {
     @Column(name = "modified_at")
     private LocalDateTime modifiedAt;
     
-    @OneToOne(mappedBy = "aircraft", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Maintenance service;
+    @OneToMany(mappedBy = "aircraft", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Maintenance> services = new ArrayList<>();
     
     @OneToMany(mappedBy = "aircraft", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Flight> flights = new ArrayList<>();
@@ -49,7 +53,8 @@ public class Aircraft {
     // Constructors
     public Aircraft() {}
     
-    public Aircraft(String model, AircraftStatus status, Integer capacity) {
+    public Aircraft(String registration, String model, AircraftStatus status, Integer capacity) {
+        this.registration = registration;
         this.model = model;
         this.status = status;
         this.capacity = capacity;
@@ -62,6 +67,14 @@ public class Aircraft {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public String getRegistration() {
+        return registration;
+    }
+    
+    public void setRegistration(String registration) {
+        this.registration = registration;
     }
     
     public String getModel() {
@@ -104,12 +117,12 @@ public class Aircraft {
         this.modifiedAt = modifiedAt;
     }
     
-    public Maintenance getService() {
-        return service;
+    public List<Maintenance> getServices() {
+        return services;
     }
     
-    public void setService(Maintenance service) {
-        this.service = service;
+    public void setServices(List<Maintenance> services) {
+        this.services = services;
     }
     
     public List<Flight> getFlights() {
@@ -122,9 +135,9 @@ public class Aircraft {
     
     // Nested Enum
     public enum AircraftStatus {
+        AVAILABLE,
         ACTIVE,
         MAINTENANCE,
-        OUT_OF_SERVICE,
         RETIRED
     }
 }

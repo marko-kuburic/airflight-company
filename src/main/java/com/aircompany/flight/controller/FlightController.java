@@ -80,24 +80,24 @@ public class FlightController {
     }
     
     @PostMapping
-    public ResponseEntity<FlightResponseDto> createFlight(@Valid @RequestBody FlightRequestDto requestDto) {
+    public ResponseEntity<?> createFlight(@Valid @RequestBody FlightRequestDto requestDto) {
         try {
             FlightResponseDto createdFlight = flightService.createFlight(requestDto);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdFlight);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
         }
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<FlightResponseDto> updateFlight(@PathVariable Long id, 
+    public ResponseEntity<?> updateFlight(@PathVariable Long id, 
                                                        @Valid @RequestBody FlightRequestDto requestDto) {
         try {
             Optional<FlightResponseDto> updatedFlight = flightService.updateFlight(id, requestDto);
             return updatedFlight.map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
         }
     }
     

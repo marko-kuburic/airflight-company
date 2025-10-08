@@ -2,6 +2,7 @@ package com.aircompany.flight.service;
 
 import com.aircompany.flight.model.Flight;
 import com.aircompany.flight.model.Aircraft;
+import com.aircompany.flight.model.Route;
 import com.aircompany.flight.dto.FlightRequestDto;
 import com.aircompany.flight.dto.FlightResponseDto;
 import com.aircompany.sales.dto.FlightSearchRequest;
@@ -486,6 +487,15 @@ public class FlightService {
         flight.setArrTime(requestDto.getArrTime());
         flight.setStatus(requestDto.getStatus());
         
+        // Enforce unique flight number
+        Long existingCount = entityManager.createQuery(
+                "SELECT COUNT(f) FROM Flight f WHERE f.flightNumber = :fn", Long.class)
+            .setParameter("fn", requestDto.getFlightNumber())
+            .getSingleResult();
+        if (existingCount != null && existingCount > 0) {
+            throw new IllegalArgumentException("Flight number already exists: " + requestDto.getFlightNumber());
+        }
+
         // Set aircraft
         if (requestDto.getAircraftId() != null) {
             Aircraft aircraft = entityManager.find(Aircraft.class, requestDto.getAircraftId());
@@ -495,8 +505,14 @@ public class FlightService {
             flight.setAircraft(aircraft);
         }
         
-        // Set route (you may need to implement this based on your Route entity)
-        // flight.setRoute(route);
+        // Set route
+        if (requestDto.getRouteId() != null) {
+            Route route = entityManager.find(Route.class, requestDto.getRouteId());
+            if (route == null) {
+                throw new IllegalArgumentException("Route not found with ID: " + requestDto.getRouteId());
+            }
+            flight.setRoute(route);
+        }
         
         entityManager.persist(flight);
         entityManager.flush();
@@ -516,6 +532,17 @@ public class FlightService {
         
         // Update flight information
         if (requestDto.getFlightNumber() != null) {
+            // Ensure new flight number (if changed) remains unique
+            if (!requestDto.getFlightNumber().equals(flight.getFlightNumber())) {
+                Long existingCount = entityManager.createQuery(
+                        "SELECT COUNT(f) FROM Flight f WHERE f.flightNumber = :fn AND f.id <> :id", Long.class)
+                    .setParameter("fn", requestDto.getFlightNumber())
+                    .setParameter("id", id)
+                    .getSingleResult();
+                if (existingCount != null && existingCount > 0) {
+                    throw new IllegalArgumentException("Flight number already exists: " + requestDto.getFlightNumber());
+                }
+            }
             flight.setFlightNumber(requestDto.getFlightNumber());
         }
         if (requestDto.getDepTime() != null) {
@@ -535,6 +562,15 @@ public class FlightService {
                 throw new IllegalArgumentException("Aircraft not found with ID: " + requestDto.getAircraftId());
             }
             flight.setAircraft(aircraft);
+        }
+        
+        // Update route if provided
+        if (requestDto.getRouteId() != null) {
+            Route route = entityManager.find(Route.class, requestDto.getRouteId());
+            if (route == null) {
+                throw new IllegalArgumentException("Route not found with ID: " + requestDto.getRouteId());
+            }
+            flight.setRoute(route);
         }
         
         entityManager.merge(flight);

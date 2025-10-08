@@ -2,6 +2,7 @@ package com.aircompany.flight.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 public class SegmentResponseDto {
     
@@ -15,6 +16,8 @@ public class SegmentResponseDto {
     private String destinationAirportCode;
     private String destinationAirportName;
     private BigDecimal distance;
+    private LocalTime departureTime;
+    private LocalTime arrivalTime;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
     
@@ -27,6 +30,16 @@ public class SegmentResponseDto {
         this.originAirportId = originAirportId;
         this.destinationAirportId = destinationAirportId;
         this.distance = distance;
+    }
+    
+    public SegmentResponseDto(Long id, Long routeId, Long originAirportId, Long destinationAirportId, BigDecimal distance, LocalTime departureTime, LocalTime arrivalTime) {
+        this.id = id;
+        this.routeId = routeId;
+        this.originAirportId = originAirportId;
+        this.destinationAirportId = destinationAirportId;
+        this.distance = distance;
+        this.departureTime = departureTime;
+        this.arrivalTime = arrivalTime;
     }
     
     // Getters and Setters
@@ -108,6 +121,22 @@ public class SegmentResponseDto {
     
     public void setDistance(BigDecimal distance) {
         this.distance = distance;
+    }
+    
+    public LocalTime getDepartureTime() {
+        return departureTime;
+    }
+    
+    public void setDepartureTime(LocalTime departureTime) {
+        this.departureTime = departureTime;
+    }
+    
+    public LocalTime getArrivalTime() {
+        return arrivalTime;
+    }
+    
+    public void setArrivalTime(LocalTime arrivalTime) {
+        this.arrivalTime = arrivalTime;
     }
     
     public LocalDateTime getCreatedAt() {

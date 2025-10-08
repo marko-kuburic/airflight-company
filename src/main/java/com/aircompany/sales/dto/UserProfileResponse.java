@@ -2,6 +2,7 @@ package com.aircompany.sales.dto;
 
 import com.aircompany.hr.model.Customer;
 import com.aircompany.sales.model.Loyalty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.LocalDateTime;
 
@@ -16,8 +17,10 @@ public class UserProfileResponse {
     private String dateOfBirth;
     private String preferredLanguage;
     private LocalDateTime createdAt;
+    private String userType;
     
     // Loyalty information
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private LoyaltyInfo loyalty;
     
     // Constructors
@@ -118,6 +121,14 @@ public class UserProfileResponse {
     
     public void setPreferredLanguage(String preferredLanguage) {
         this.preferredLanguage = preferredLanguage;
+    }
+    
+    public String getUserType() {
+        return userType;
+    }
+    
+    public void setUserType(String userType) {
+        this.userType = userType;
     }
     
     // Nested class for loyalty information
