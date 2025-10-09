@@ -248,6 +248,65 @@ public class FlightController {
     }
     
     /**
+     * Get all flights with full details (for dispatcher management)
+     */
+    @GetMapping("/management/all")
+    public ResponseEntity<?> getAllFlightsForManagement() {
+        try {
+            List<Flight> flights = flightService.getAllFlights();
+            
+            // Convert to map with all details, handling lazy loading carefully
+            List<Map<String, Object>> detailedFlights = flights.stream()
+                .map(flight -> {
+                    Map<String, Object> flightMap = new HashMap<>();
+                    flightMap.put("id", flight.getId());
+                    flightMap.put("flightNumber", flight.getFlightNumber());
+                    flightMap.put("departureTime", flight.getDepTime());
+                    flightMap.put("arrivalTime", flight.getArrTime());
+                    flightMap.put("status", flight.getStatus());
+                    
+                    // Safely add related entity IDs
+                    try {
+                        if (flight.getRoute() != null) {
+                            flightMap.put("routeId", flight.getRoute().getId());
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not load route for flight {}", flight.getId());
+                    }
+                    
+                    try {
+                        if (flight.getAircraft() != null) {
+                            flightMap.put("aircraftId", flight.getAircraft().getId());
+                            flightMap.put("aircraftModel", flight.getAircraft().getModel());
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not load aircraft for flight {}", flight.getId());
+                    }
+                    
+                    try {
+                        if (flight.getFlightDispatcher() != null) {
+                            flightMap.put("flightDispatcherId", flight.getFlightDispatcher().getId());
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not load dispatcher for flight {}", flight.getId());
+                    }
+                    
+                    return flightMap;
+                })
+                .collect(Collectors.toList());
+            
+            logger.info("Management: Found {} total flights in database", flights.size());
+            return ResponseEntity.ok(Map.of(
+                "totalFlights", flights.size(),
+                "flights", detailedFlights
+            ));
+        } catch (Exception e) {
+            logger.error("Error getting all flights for management: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error getting flights: " + e.getMessage()));
+        }
+    }
+    
+    /**
      * Refresh offer for flight when expired - regenerate with new pricing
      */
     @PostMapping("/{flightId}/refresh-offer")
