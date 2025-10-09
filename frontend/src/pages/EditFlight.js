@@ -25,11 +25,29 @@ export default function EditFlight() {
   };
 
   const getFilteredRoutes = () => {
-    if (!routes.length) return routes;
+    if (!routes.length || !flight || !flight.routeId) return routes;
     
-    // For now, show all routes since we don't have the original flight's route info
-    // In a real implementation, you'd need to get the flight's route from a different endpoint
-    return routes;
+    // Find the original route to get origin and destination airports
+    const originalRoute = routes.find(r => r.id === flight.routeId);
+    if (!originalRoute || !originalRoute.segments || originalRoute.segments.length === 0) {
+      return routes;
+    }
+    
+    const firstSegment = originalRoute.segments[0];
+    const lastSegment = originalRoute.segments[originalRoute.segments.length - 1];
+    const originAirportId = firstSegment.originAirportId;
+    const destinationAirportId = lastSegment.destinationAirportId;
+    
+    // Filter routes that have the same origin and destination airports
+    return routes.filter(route => {
+      if (!route.segments || route.segments.length === 0) return false;
+      
+      const routeFirstSegment = route.segments[0];
+      const routeLastSegment = route.segments[route.segments.length - 1];
+      
+      return routeFirstSegment.originAirportId === originAirportId && 
+             routeLastSegment.destinationAirportId === destinationAirportId;
+    });
   };
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +62,8 @@ export default function EditFlight() {
     arrivalDate: '',
     arrivalTime: '',
     status: 'SCHEDULED',
-    aircraftId: ''
+    aircraftId: '',
+    delayMinutes: 0 // Flight delay in minutes
   });
 
   // Data state
@@ -105,7 +124,8 @@ export default function EditFlight() {
           arrivalDate: flight.arrivalTime ? flight.arrivalTime.split('T')[0] : '',
           arrivalTime: flight.arrivalTime ? flight.arrivalTime.split('T')[1].substring(0, 5) : '',
           status: flight.status || 'SCHEDULED',
-          aircraftId: flight.aircraftId ? flight.aircraftId.toString() : ''
+          aircraftId: flight.aircraftId ? flight.aircraftId.toString() : '',
+          delayMinutes: 0 // Initialize delay to 0
         });
 
         const routesData = routesResponse.data;
@@ -164,35 +184,71 @@ export default function EditFlight() {
     }
   }, [formData.routeId, routes]);
 
-  const calculateArrivalTime = (departureDate, departureTime, route) => {
+  const calculateArrivalTime = (departureDate, departureTime, route, delayMinutes = 0) => {
     if (!departureDate || !departureTime || !route || !route.segments || route.segments.length === 0) {
-      return { date: '', time: '' };
+      return { date: '', time: '', dateTime: '' };
     }
 
-    // Calculate total route duration from segments
-    let totalDurationMinutes = 0;
-    route.segments.forEach(segment => {
-      if (segment.departureTime && segment.arrivalTime) {
-        const depTime = new Date(`2000-01-01T${segment.departureTime}`);
-        const arrTime = new Date(`2000-01-01T${segment.arrivalTime}`);
-        const duration = (arrTime - depTime) / (1000 * 60); // Convert to minutes
-        totalDurationMinutes += duration;
+    try {
+      // Calculate total route duration from segments (durationMinutes + layoverMinutes)
+      let totalDurationMinutes = 0;
+      let adjustedDurationMinutes = 0;
+      
+      route.segments.forEach((segment, index) => {
+        if (segment.durationMinutes) {
+          totalDurationMinutes += segment.durationMinutes;
+          adjustedDurationMinutes += segment.durationMinutes;
+        }
+        
+        // Handle layover time with delay adjustment (layover is time between segments)
+        // Only check layover for segments after the first one (index > 0)
+        if (segment.layoverMinutes && index > 0) {
+          const originalLayover = segment.layoverMinutes;
+          
+          // For layover adjustment: if (layover - 15) < delay, then reduce arrival delay by the difference
+          if (delayMinutes > 0 && originalLayover > 15) {
+            const layoverReduction = Math.min(delayMinutes, originalLayover - 15);
+            const adjustedLayover = originalLayover - layoverReduction;
+            totalDurationMinutes += originalLayover; // Add original layover to total
+            adjustedDurationMinutes += adjustedLayover; // Add adjusted layover to adjusted total
+          } else {
+            totalDurationMinutes += originalLayover;
+            adjustedDurationMinutes += originalLayover;
+          }
+        }
+      });
+
+      // If no segment durations available, return empty
+      if (totalDurationMinutes === 0) {
+        console.warn('No valid segment durations found for route');
+        return { date: '', time: '', dateTime: '' };
       }
-    });
 
-    // If no segment times available, use a default duration (2 hours)
-    if (totalDurationMinutes === 0) {
-      totalDurationMinutes = 120; // 2 hours default
+      // Calculate departure time with delay
+      const departureDateTime = new Date(`${departureDate}T${departureTime}:00`);
+      const delayedDepartureTime = new Date(departureDateTime.getTime() + delayMinutes * 60000);
+      
+      // Calculate arrival time using adjusted duration
+      const arrivalDateTime = new Date(delayedDepartureTime.getTime() + adjustedDurationMinutes * 60000);
+
+      const arrivalDate = arrivalDateTime.toISOString().split('T')[0];
+      const arrivalTime = arrivalDateTime.toTimeString().substring(0, 5);
+      const arrivalDateTimeStr = `${arrivalDate}T${arrivalTime}:00`;
+
+      return {
+        date: arrivalDate,
+        time: arrivalTime,
+        dateTime: arrivalDateTimeStr,
+        delayedDeparture: {
+          date: delayedDepartureTime.toISOString().split('T')[0],
+          time: delayedDepartureTime.toTimeString().substring(0, 5),
+          dateTime: `${delayedDepartureTime.toISOString().split('T')[0]}T${delayedDepartureTime.toTimeString().substring(0, 5)}:00`
+        }
+      };
+    } catch (error) {
+      console.error('Error calculating arrival time:', error);
+      return { date: '', time: '', dateTime: '' };
     }
-
-    // Calculate arrival time
-    const departureDateTime = new Date(`${departureDate}T${departureTime}:00`);
-    const arrivalDateTime = new Date(departureDateTime.getTime() + (totalDurationMinutes * 60 * 1000));
-
-    return {
-      date: arrivalDateTime.toISOString().split('T')[0],
-      time: arrivalDateTime.toTimeString().substring(0, 5)
-    };
   };
 
   const handleInputChange = (field, value) => {
@@ -202,8 +258,8 @@ export default function EditFlight() {
         [field]: value
       };
 
-      // Recalculate arrival time when departure time or route changes
-      if (field === 'departureDate' || field === 'departureTime' || field === 'routeId') {
+      // Recalculate arrival time when departure time, route, or delay changes
+      if (field === 'departureDate' || field === 'departureTime' || field === 'routeId' || field === 'delayMinutes') {
         const selectedRoute = field === 'routeId' 
           ? routes.find(r => r.id === parseInt(value))
           : routes.find(r => r.id === parseInt(prev.routeId));
@@ -211,7 +267,8 @@ export default function EditFlight() {
         const arrival = calculateArrivalTime(
           field === 'departureDate' ? value : newData.departureDate,
           field === 'departureTime' ? value : newData.departureTime,
-          selectedRoute
+          selectedRoute,
+          field === 'delayMinutes' ? parseInt(value) || 0 : newData.delayMinutes || 0
         );
         
         newData.arrivalDate = arrival.date;
@@ -286,11 +343,29 @@ export default function EditFlight() {
         return;
       }
 
-      // Only validate dates if they're provided
-      if (formData.departureDate && formData.arrivalDate) {
-        if (new Date(formData.departureDate) >= new Date(formData.arrivalDate)) {
-          console.log('Validation failed: date order');
-          toast.error('Arrival date must be after departure date');
+      // Only validate dates if they're provided - compare full datetime
+      if (formData.departureDate && formData.departureTime && formData.arrivalDate && formData.arrivalTime) {
+        const departureDateTime = new Date(`${formData.departureDate}T${formData.departureTime}:00`);
+        const arrivalDateTime = new Date(`${formData.arrivalDate}T${formData.arrivalTime}:00`);
+        
+        if (departureDateTime >= arrivalDateTime) {
+          console.log('Validation failed: datetime order');
+          toast.error('Arrival date/time must be after departure date/time');
+          return;
+        }
+      }
+
+      // Validate DELAYED status requirements
+      if (formData.status === 'DELAYED') {
+        const hasDelay = formData.delayMinutes > 0;
+        const originalDepDate = flight?.departureTime?.split('T')[0] || '';
+        const originalDepTime = flight?.departureTime?.split('T')[1]?.substring(0, 5) || '';
+        const hasTimeChange = formData.departureDate !== originalDepDate || 
+                             formData.departureTime !== originalDepTime;
+        
+        if (!hasDelay && !hasTimeChange) {
+          console.log('Validation failed: DELAYED status requires delay or time change');
+          toast.error('DELAYED status requires either delay minutes or departure time change');
           return;
         }
       }
@@ -516,6 +591,44 @@ export default function EditFlight() {
                       fontFamily: 'Inter, sans-serif'
                     }}
                   />
+                </div>
+              </div>
+
+              {/* Flight Delay */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: '#4A5568',
+                  marginBottom: '4px',
+                  fontFamily: 'Inter, sans-serif'
+                }}>
+                  Flight Delay (minutes)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.delayMinutes}
+                  onChange={(e) => handleInputChange('delayMinutes', e.target.value)}
+                  placeholder="Delay in minutes (e.g., 60)"
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '8px 12px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: 'Inter, sans-serif'
+                  }}
+                />
+                <div style={{
+                  fontSize: '11px',
+                  color: '#6B7280',
+                  marginTop: '4px',
+                  fontFamily: 'Inter, sans-serif'
+                }}>
+                  Layover times will be reduced if delay > (layover - 15min)
                 </div>
               </div>
 
@@ -773,21 +886,46 @@ export default function EditFlight() {
                 borderRadius: '8px',
                 padding: '16px'
               }}>
-                {selectedRoute.segments.map((segment, index) => (
-                  <div key={segment.id} style={{
-                    marginBottom: index < selectedRoute.segments.length - 1 ? '8px' : '0',
-                    paddingBottom: index < selectedRoute.segments.length - 1 ? '8px' : '0',
-                    borderBottom: index < selectedRoute.segments.length - 1 ? '1px solid #E2E8F0' : 'none'
-                  }}>
-                    <span style={{
-                      fontSize: '14px',
-                      color: '#2D3748',
-                      fontFamily: 'Inter, sans-serif'
+                {selectedRoute.segments.map((segment, index) => {
+                  // Format duration
+                  const formatDuration = (minutes) => {
+                    if (!minutes || minutes === 0) return '0m';
+                    const hours = Math.floor(minutes / 60);
+                    const mins = minutes % 60;
+                    if (hours === 0) return `${mins}m`;
+                    if (mins === 0) return `${hours}h`;
+                    return `${hours}h ${mins}m`;
+                  };
+
+                  return (
+                    <div key={segment.id} style={{
+                      marginBottom: index < selectedRoute.segments.length - 1 ? '8px' : '0',
+                      paddingBottom: index < selectedRoute.segments.length - 1 ? '8px' : '0',
+                      borderBottom: index < selectedRoute.segments.length - 1 ? '1px solid #E2E8F0' : 'none',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}>
-                      {index + 1}) {segment.originAirportCode} → {segment.destinationAirportCode} — {segment.departureTime || 'N/A'} / {segment.arrivalTime || 'N/A'}
-                    </span>
-                  </div>
-                ))}
+                      <span style={{
+                        fontSize: '14px',
+                        color: '#2D3748',
+                        fontFamily: 'Inter, sans-serif'
+                      }}>
+                        {index + 1}) {segment.originAirportCode} → {segment.destinationAirportCode}
+                      </span>
+                      <div style={{
+                        display: 'flex',
+                        gap: '12px',
+                        fontSize: '12px',
+                        color: '#6B7280',
+                        fontFamily: 'Inter, sans-serif'
+                      }}>
+                        <span>Flight: {formatDuration(segment.durationMinutes)}</span>
+                        <span>Layover: {index === 0 ? 'N/A' : formatDuration(segment.layoverMinutes || 0)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
