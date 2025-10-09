@@ -48,20 +48,44 @@ export default function Flights() {
         headers['Authorization'] = `Bearer ${authToken}`;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/flights/debug/all`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/flights/management/all`, {
         headers
       });
       
       if (response.ok) {
         const data = await response.json();
+        
+        // Load routes and aircraft data
+        const [routesResponse, aircraftResponse] = await Promise.all([
+          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/flight/routes`, { headers }),
+          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/flight/aircraft`, { headers })
+        ]);
+        
+        const routesData = routesResponse.ok ? await routesResponse.json() : [];
+        const aircraftData = aircraftResponse.ok ? await aircraftResponse.json() : [];
+        
+        // Create lookup maps
+        const routesMap = {};
+        routesData.forEach(route => {
+          routesMap[route.id] = route.name;
+        });
+        
+        const aircraftMap = {};
+        aircraftData.forEach(aircraft => {
+          aircraftMap[aircraft.id] = `${aircraft.model} (${aircraft.registration})`;
+        });
+        
         const flightsData = data.flights.map(flight => ({
           id: flight.id,
           flightNumber: flight.flightNumber,
-          route: 'Route TBD', // We'll need to load route data separately
+          route: routesMap[flight.routeId] || 'Unknown Route',
           departureTime: flight.departureTime ? new Date(flight.departureTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'N/A',
           arrivalTime: flight.arrivalTime ? new Date(flight.arrivalTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'N/A',
-          aircraft: 'Aircraft TBD', // We'll need to load aircraft data separately
-          status: flight.status
+          aircraft: aircraftMap[flight.aircraftId] || 'Unknown Aircraft',
+          status: flight.status,
+          // Store full datetime for date display
+          departureDateTime: flight.departureTime,
+          arrivalDateTime: flight.arrivalTime
         }));
         
         setFlights(flightsData);
@@ -394,6 +418,16 @@ export default function Flights() {
                     color: '#4A5568',
                     borderBottom: '1px solid #E2E8F0'
                   }}>
+                    Date
+                  </th>
+                  <th style={{
+                    padding: '16px 24px',
+                    textAlign: 'left',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#4A5568',
+                    borderBottom: '1px solid #E2E8F0'
+                  }}>
                     Route
                   </th>
                   <th style={{
@@ -441,7 +475,7 @@ export default function Flights() {
               <tbody>
                 {flights.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{
+                    <td colSpan="7" style={{
                       padding: '32px',
                       textAlign: 'center',
                       fontSize: '14px',
@@ -463,6 +497,13 @@ export default function Flights() {
                         fontWeight: '500'
                       }}>
                         {flight.flightNumber}
+                      </td>
+                      <td style={{
+                        padding: '16px 24px',
+                        fontSize: '14px',
+                        color: '#4A5568'
+                      }}>
+                        {flight.departureDateTime ? new Date(flight.departureDateTime).toLocaleDateString() : 'N/A'}
                       </td>
                       <td style={{
                         padding: '16px 24px',
