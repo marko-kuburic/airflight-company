@@ -15,12 +15,45 @@ export default function AddRoute() {
   // Route form state
   const [routeName, setRouteName] = useState('');
 
+  // Calculate distance using Haversine formula (same as backend)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const EARTH_RADIUS_KM = 6371.0;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const rLat1 = lat1 * Math.PI / 180;
+    const rLat2 = lat2 * Math.PI / 180;
+
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(rLat1) * Math.cos(rLat2) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return EARTH_RADIUS_KM * c;
+  };
+
+  // Calculate flight duration based on distance (same as backend)
+  const calculateDuration = (distanceKm) => {
+    if (distanceKm <= 0) return 0;
+    const AVERAGE_CRUISE_SPEED_KMH = 800.0;
+    const TURNAROUND_TIME_MINUTES = 30;
+    const flightTimeHours = distanceKm / AVERAGE_CRUISE_SPEED_KMH;
+    return Math.round(flightTimeHours * 60) + TURNAROUND_TIME_MINUTES;
+  };
+
+  // Format minutes to hours and minutes
+  const formatDuration = (minutes) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins}m`;
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h ${mins}m`;
+  };
+
   // Form state for new segment
   const [newSegment, setNewSegment] = useState({
     originAirportId: '',
     destinationAirportId: '',
-    departureTime: '',
-    arrivalTime: ''
+    layoverMinutes: 0 // Time to wait at destination before next segment
   });
 
   // Load airports on component mount
@@ -55,25 +88,15 @@ export default function AddRoute() {
     console.log('Add Segment clicked!', newSegment);
     
     // Validate required fields
-    if (!newSegment.originAirportId || !newSegment.destinationAirportId || 
-        !newSegment.departureTime || !newSegment.arrivalTime) {
+    if (!newSegment.originAirportId || !newSegment.destinationAirportId) {
       console.log('Validation failed - missing fields');
-      toast.error('Please fill in all fields');
+      toast.error('Please select origin and destination airports');
       return;
     }
 
     // Validate that origin and destination are different
     if (newSegment.originAirportId === newSegment.destinationAirportId) {
       toast.error('Origin and destination airports must be different');
-      return;
-    }
-
-    // Validate time format and logic
-    const depTime = newSegment.departureTime;
-    const arrTime = newSegment.arrivalTime;
-    
-    if (depTime >= arrTime) {
-      toast.error('Arrival time must be after departure time');
       return;
     }
 
@@ -86,14 +109,23 @@ export default function AddRoute() {
       return;
     }
 
-    // Create new segment (distance will be calculated by backend)
+    // Calculate distance and duration for display
+    const distance = calculateDistance(
+      originAirport.latitude,
+      originAirport.longitude,
+      destinationAirport.latitude,
+      destinationAirport.longitude
+    );
+    const duration = calculateDuration(distance);
+
+    // Create new segment
     const segment = {
       id: segments.length + 1,
       originAirport: originAirport,
       destinationAirport: destinationAirport,
-      departureTime: newSegment.departureTime,
-      arrivalTime: newSegment.arrivalTime,
-      distance: 0 // Will be calculated by backend
+      layoverMinutes: segments.length === 0 ? 0 : (parseInt(newSegment.layoverMinutes) || 0), // First segment has no layover
+      distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+      durationMinutes: duration
     };
 
     console.log('Adding segment to list:', segment);
@@ -107,8 +139,7 @@ export default function AddRoute() {
     setNewSegment({
       originAirportId: '',
       destinationAirportId: '',
-      departureTime: '',
-      arrivalTime: ''
+      layoverMinutes: 0
     });
 
     console.log('Segment added successfully!');
@@ -155,8 +186,7 @@ export default function AddRoute() {
           routeId: createdRoute.id,
           originAirportId: segment.originAirport.id,
           destinationAirportId: segment.destinationAirport.id,
-          departureTime: segment.departureTime,
-          arrivalTime: segment.arrivalTime
+          layoverMinutes: segment.layoverMinutes || 0
         };
         return segmentAPI.createSegment(segmentData);
       });
@@ -174,8 +204,7 @@ export default function AddRoute() {
       setNewSegment({
         originAirportId: '',
         destinationAirportId: '',
-        departureTime: '',
-        arrivalTime: ''
+        layoverMinutes: 0
       });
     } catch (error) {
       console.error('Error creating route:', error);
@@ -337,66 +366,90 @@ export default function AddRoute() {
                       fontWeight: '600',
                       color: '#4A5568',
                       borderBottom: '1px solid #E2E8F0'
-                    }}>Dep</th>
-                    <th style={{
-                      padding: '12px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: '#4A5568',
-                      borderBottom: '1px solid #E2E8F0'
-                    }}>Arr</th>
-                    <th style={{
-                      padding: '12px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: '#4A5568',
-                      borderBottom: '1px solid #E2E8F0'
                     }}>Distance</th>
+                    <th style={{
+                      padding: '12px',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#4A5568',
+                      borderBottom: '1px solid #E2E8F0'
+                    }}>Flight Time</th>
+                    <th style={{
+                      padding: '12px',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#4A5568',
+                      borderBottom: '1px solid #E2E8F0'
+                    }}>Layover</th>
+                    <th style={{
+                      padding: '12px',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#4A5568',
+                      borderBottom: '1px solid #E2E8F0'
+                    }}>Cumulative</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {segments.map((segment, index) => (
-                    <tr key={segment.id}>
-                      <td style={{
-                        padding: '12px',
-                        fontSize: '14px',
-                        color: '#2D3748',
-                        borderBottom: '1px solid #E2E8F0'
-                      }}>{index + 1}</td>
-                      <td style={{
-                        padding: '12px',
-                        fontSize: '14px',
-                        color: '#2D3748',
-                        borderBottom: '1px solid #E2E8F0'
-                      }}>{segment.originAirport.iataCode}</td>
-                      <td style={{
-                        padding: '12px',
-                        fontSize: '14px',
-                        color: '#2D3748',
-                        borderBottom: '1px solid #E2E8F0'
-                      }}>{segment.destinationAirport.iataCode}</td>
-                      <td style={{
-                        padding: '12px',
-                        fontSize: '14px',
-                        color: '#2D3748',
-                        borderBottom: '1px solid #E2E8F0'
-                      }}>{segment.departureTime}</td>
-                      <td style={{
-                        padding: '12px',
-                        fontSize: '14px',
-                        color: '#2D3748',
-                        borderBottom: '1px solid #E2E8F0'
-                      }}>{segment.arrivalTime}</td>
-                      <td style={{
-                        padding: '12px',
-                        fontSize: '14px',
-                        color: '#2D3748',
-                        borderBottom: '1px solid #E2E8F0'
-                      }}>{segment.distance} km</td>
-                    </tr>
-                  ))}
+                  {segments.map((segment, index) => {
+                    // Calculate cumulative time up to this segment
+                    let cumulativeMinutes = 0;
+                    for (let i = 0; i <= index; i++) {
+                      cumulativeMinutes += segments[i].durationMinutes || 0;
+                      cumulativeMinutes += segments[i].layoverMinutes || 0;
+                    }
+                    
+                    return (
+                      <tr key={segment.id}>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#2D3748',
+                          borderBottom: '1px solid #E2E8F0'
+                        }}>{index + 1}</td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#2D3748',
+                          borderBottom: '1px solid #E2E8F0'
+                        }}>{segment.originAirport.iataCode}</td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#2D3748',
+                          borderBottom: '1px solid #E2E8F0'
+                        }}>{segment.destinationAirport.iataCode}</td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#2D3748',
+                          borderBottom: '1px solid #E2E8F0'
+                        }}>{segment.distance} km</td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#2D3748',
+                          borderBottom: '1px solid #E2E8F0'
+                        }}>{formatDuration(segment.durationMinutes)}</td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#2D3748',
+                          borderBottom: '1px solid #E2E8F0'
+                        }}>{formatDuration(segment.layoverMinutes || 0)}</td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#3182CE',
+                          fontWeight: '600',
+                          borderBottom: '1px solid #E2E8F0'
+                        }}>{formatDuration(cumulativeMinutes)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -405,7 +458,7 @@ export default function AddRoute() {
           {/* Add Segment Form */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr auto',
+            gridTemplateColumns: '1fr 1fr 140px auto',
             gap: '16px',
             alignItems: 'end',
             marginBottom: '16px'
@@ -480,22 +533,25 @@ export default function AddRoute() {
               </select>
             </div>
 
-            {/* Departure Time */}
+            {/* Layover Time (minutes between segments) */}
             <div>
               <label style={{
                 display: 'block',
                 fontSize: '12px',
                 fontWeight: '500',
-                color: '#4A5568',
+                color: segments.length === 0 ? '#9CA3AF' : '#4A5568',
                 marginBottom: '4px',
                 fontFamily: 'Inter, sans-serif'
               }}>
-                Departure Time
+                Layover Time (minutes)
               </label>
               <input
-                type="time"
-                value={newSegment.departureTime}
-                onChange={(e) => handleInputChange('departureTime', e.target.value)}
+                type="number"
+                min="0"
+                value={segments.length === 0 ? 0 : newSegment.layoverMinutes}
+                onChange={(e) => handleInputChange('layoverMinutes', e.target.value)}
+                placeholder={segments.length === 0 ? "N/A (first segment)" : "Time between segments (e.g., 15)"}
+                disabled={segments.length === 0}
                 style={{
                   width: '100%',
                   height: '40px',
@@ -503,37 +559,19 @@ export default function AddRoute() {
                   border: '1px solid #D1D5DB',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  fontFamily: 'Inter, sans-serif'
+                  fontFamily: 'Inter, sans-serif',
+                  backgroundColor: segments.length === 0 ? '#F9FAFB' : 'white',
+                  color: segments.length === 0 ? '#9CA3AF' : 'inherit'
                 }}
               />
-            </div>
-
-            {/* Arrival Time */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: '500',
-                color: '#4A5568',
-                marginBottom: '4px',
+              <div style={{
+                fontSize: '11px',
+                color: segments.length === 0 ? '#9CA3AF' : '#6B7280',
+                marginTop: '4px',
                 fontFamily: 'Inter, sans-serif'
               }}>
-                Arrival Time
-              </label>
-              <input
-                type="time"
-                value={newSegment.arrivalTime}
-                onChange={(e) => handleInputChange('arrivalTime', e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '40px',
-                  padding: '8px 12px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontFamily: 'Inter, sans-serif'
-                }}
-              />
+                {segments.length === 0 ? 'First segment has no layover' : 'Time to wait before next segment'}
+              </div>
             </div>
 
             {/* Add Segment Button */}
