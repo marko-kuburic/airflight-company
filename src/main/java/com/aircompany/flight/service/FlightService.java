@@ -41,6 +41,9 @@ public class FlightService {
     @Autowired
     private DynamicPricingService dynamicPricingService;
     
+    @Autowired
+    private MaintenanceService maintenanceService;
+    
     /**
      * Search for flights based on search criteria
      * Supports "Anywhere" searches where origin and/or destination can be empty
@@ -502,6 +505,12 @@ public class FlightService {
             if (aircraft == null) {
                 throw new IllegalArgumentException("Aircraft not found with ID: " + requestDto.getAircraftId());
             }
+            
+            // Check aircraft availability
+            if (!isAircraftAvailable(requestDto.getAircraftId(), requestDto.getDepTime(), requestDto.getArrTime(), null)) {
+                throw new IllegalArgumentException("Aircraft is not available for the specified time period. It may be in use for another flight or under maintenance.");
+            }
+            
             flight.setAircraft(aircraft);
         }
         
@@ -561,6 +570,15 @@ public class FlightService {
             if (aircraft == null) {
                 throw new IllegalArgumentException("Aircraft not found with ID: " + requestDto.getAircraftId());
             }
+            
+            // Check aircraft availability (exclude current flight from conflict check)
+            LocalDateTime depTime = requestDto.getDepTime() != null ? requestDto.getDepTime() : flight.getDepTime();
+            LocalDateTime arrTime = requestDto.getArrTime() != null ? requestDto.getArrTime() : flight.getArrTime();
+            
+            if (!isAircraftAvailable(requestDto.getAircraftId(), depTime, arrTime, id)) {
+                throw new IllegalArgumentException("Aircraft is not available for the specified time period. It may be in use for another flight or under maintenance.");
+            }
+            
             flight.setAircraft(aircraft);
         }
         
@@ -655,5 +673,63 @@ public class FlightService {
         }
         
         return dto;
+    }
+    
+    /**
+     * Check if aircraft is available for a given time period
+     * @param aircraftId Aircraft ID to check
+     * @param departureTime Flight departure time
+     * @param arrivalTime Flight arrival time
+     * @param excludeFlightId Flight ID to exclude from conflict check (for updates)
+     * @return true if aircraft is available, false otherwise
+     */
+    @Transactional(readOnly = true)
+    public boolean isAircraftAvailable(Long aircraftId, LocalDateTime departureTime, LocalDateTime arrivalTime, Long excludeFlightId) {
+        try {
+            // Check for conflicting flights
+            String flightConflictQuery = "SELECT COUNT(f) FROM Flight f WHERE f.aircraft.id = :aircraftId " +
+                "AND f.id != :excludeFlightId " +
+                "AND ((f.depTime <= :departureTime AND f.arrTime > :departureTime) " +
+                "OR (f.depTime < :arrivalTime AND f.arrTime >= :arrivalTime) " +
+                "OR (f.depTime >= :departureTime AND f.arrTime <= :arrivalTime))";
+            
+            TypedQuery<Long> flightQuery = entityManager.createQuery(flightConflictQuery, Long.class);
+            flightQuery.setParameter("aircraftId", aircraftId);
+            flightQuery.setParameter("excludeFlightId", excludeFlightId != null ? excludeFlightId : -1L);
+            flightQuery.setParameter("departureTime", departureTime);
+            flightQuery.setParameter("arrivalTime", arrivalTime);
+            
+            Long conflictingFlights = flightQuery.getSingleResult();
+            
+            if (conflictingFlights > 0) {
+                logger.info("Aircraft {} has {} conflicting flights", aircraftId, conflictingFlights);
+                return false;
+            }
+            
+            // Check for maintenance conflicts
+            String maintenanceConflictQuery = "SELECT COUNT(m) FROM Maintenance m WHERE m.aircraft.id = :aircraftId " +
+                "AND ((m.startDate <= :departureTime AND m.endDate > :departureTime) " +
+                "OR (m.startDate < :arrivalTime AND m.endDate >= :arrivalTime) " +
+                "OR (m.startDate >= :departureTime AND m.endDate <= :arrivalTime))";
+            
+            TypedQuery<Long> maintenanceQuery = entityManager.createQuery(maintenanceConflictQuery, Long.class);
+            maintenanceQuery.setParameter("aircraftId", aircraftId);
+            maintenanceQuery.setParameter("departureTime", departureTime);
+            maintenanceQuery.setParameter("arrivalTime", arrivalTime);
+            
+            Long conflictingMaintenance = maintenanceQuery.getSingleResult();
+            
+            if (conflictingMaintenance > 0) {
+                logger.info("Aircraft {} has {} conflicting maintenance schedules", aircraftId, conflictingMaintenance);
+                return false;
+            }
+            
+            logger.info("Aircraft {} is available for the requested time period", aircraftId);
+            return true;
+            
+        } catch (Exception e) {
+            logger.error("Error checking aircraft availability: {}", e.getMessage());
+            return false;
+        }
     }
 }
