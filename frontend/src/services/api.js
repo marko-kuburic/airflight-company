@@ -95,7 +95,7 @@ export const flightAPI = {
   // Flight search
   searchFlights: (params) => api.get('/flights/search', { params }),
   getFlightById: (id) => api.get(`/flights/${id}`),
-  getAllFlights: () => api.get('/flights/debug/all'),
+  getAllFlights: () => api.get('/flights/management/all'),
 
   // Flight management
   createFlight: (data) => api.post('/flights', data),
@@ -287,6 +287,17 @@ export const downloadTicket = async (ticketId) => {
   } catch (error) {
     handleApiError(error);
   }
+};
+
+export const reportsAPI = {
+  // Get all reports
+  getAllReports: (startDate, endDate) => api.get('/reports/all', { params: { startDate, endDate } }),
+  
+  // Individual reports
+  getFlightsPerAircraftRoute: (startDate, endDate) => api.get('/reports/flights-per-aircraft-route', { params: { startDate, endDate } }),
+  getFlightStatuses: (startDate, endDate) => api.get('/reports/flight-statuses', { params: { startDate, endDate } }),
+  getAvgTimeBetweenServices: () => api.get('/reports/avg-time-between-services'),
+  getPlanChangeFrequency: () => api.get('/reports/plan-change-frequency'),
 };
 
 export default api;
