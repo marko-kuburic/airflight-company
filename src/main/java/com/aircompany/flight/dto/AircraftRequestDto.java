@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotNull;
 
 public class AircraftRequestDto {
     
+    @NotBlank(message = "Aircraft registration is required")
+    private String registration;
+    
     @NotBlank(message = "Aircraft model is required")
     private String model;
     
@@ -18,13 +21,22 @@ public class AircraftRequestDto {
     // Constructors
     public AircraftRequestDto() {}
     
-    public AircraftRequestDto(String model, AircraftStatus status, Integer capacity) {
+    public AircraftRequestDto(String registration, String model, AircraftStatus status, Integer capacity) {
+        this.registration = registration;
         this.model = model;
         this.status = status;
         this.capacity = capacity;
     }
     
     // Getters and Setters
+    public String getRegistration() {
+        return registration;
+    }
+    
+    public void setRegistration(String registration) {
+        this.registration = registration;
+    }
+    
     public String getModel() {
         return model;
     }

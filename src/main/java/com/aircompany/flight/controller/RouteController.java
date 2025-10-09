@@ -86,6 +86,14 @@ public class RouteController {
         return ResponseEntity.status(HttpStatus.CREATED).body(createdRoute);
     }
     
+    @PostMapping("/{id}/recalculate-distance")
+    public ResponseEntity<RouteResponseDto> recalculateTotalDistance(@PathVariable Long id) {
+        routeService.recalculateTotalDistance(id);
+        Optional<RouteResponseDto> route = routeService.getRouteById(id);
+        return route.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
     @PutMapping("/{id}")
     public ResponseEntity<RouteResponseDto> updateRoute(@PathVariable Long id, 
                                                      @Valid @RequestBody RouteRequestDto requestDto) {

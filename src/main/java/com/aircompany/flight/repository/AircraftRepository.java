@@ -13,6 +13,10 @@ import java.util.Optional;
 @Repository
 public interface AircraftRepository extends JpaRepository<Aircraft, Long> {
     
+    Optional<Aircraft> findByRegistration(String registration);
+    
+    boolean existsByRegistration(String registration);
+    
     List<Aircraft> findByStatus(AircraftStatus status);
     
     List<Aircraft> findByModelContainingIgnoreCase(String model);
@@ -23,11 +27,11 @@ public interface AircraftRepository extends JpaRepository<Aircraft, Long> {
     
     List<Aircraft> findByCapacityBetween(Integer minCapacity, Integer maxCapacity);
     
-    @Query("SELECT a FROM Aircraft a LEFT JOIN FETCH a.service WHERE a.id = :id")
-    Optional<Aircraft> findByIdWithService(@Param("id") Long id);
+    @Query("SELECT a FROM Aircraft a LEFT JOIN FETCH a.services WHERE a.registration = :registration")
+    Optional<Aircraft> findByRegistrationWithService(@Param("registration") String registration);
     
-    @Query("SELECT a FROM Aircraft a LEFT JOIN FETCH a.flights WHERE a.id = :id")
-    Optional<Aircraft> findByIdWithFlights(@Param("id") Long id);
+    @Query("SELECT a FROM Aircraft a LEFT JOIN FETCH a.flights WHERE a.registration = :registration")
+    Optional<Aircraft> findByRegistrationWithFlights(@Param("registration") String registration);
     
     @Query("SELECT COUNT(a) FROM Aircraft a WHERE a.status = :status")
     Long countByStatus(@Param("status") AircraftStatus status);

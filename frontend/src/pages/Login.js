@@ -26,10 +26,24 @@ export default function Login() {
           const userData = response.data.user || response.data.customer;
           localStorage.setItem('user', JSON.stringify(userData));
           
+          console.log('Login - User data:', userData);
+          console.log('Login - user_type:', userData.user_type);
+          console.log('Login - userType:', userData.userType);
+          
           toast.success(`Welcome back, ${userData.firstName || userData.email}!`);
           
-          // Redirect to flight search page
-          navigate('/search');
+          // Check if user is a flight dispatcher
+          if (userData.user_type === 'FLIGHT_DISPATCHER' || userData.userType === 'FLIGHT_DISPATCHER') {
+            console.log('Login - Redirecting to /dispatcher/aircrafts');
+            navigate('/dispatcher/aircrafts');
+          } else if (userData.user_type === 'TECHNICIAN' || userData.userType === 'TECHNICIAN') {
+            console.log('Login - Redirecting to /technician/records');
+            navigate('/technician/records');
+          } else {
+            console.log('Login - Redirecting to /dashboard');
+            // Redirect to dashboard or home for regular users
+            navigate('/dashboard');
+          }
         } else {
           toast.success('Login successful!');
           navigate('/search');

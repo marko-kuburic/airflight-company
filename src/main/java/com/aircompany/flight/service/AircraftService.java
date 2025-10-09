@@ -31,6 +31,11 @@ public class AircraftService {
                 .map(this::convertToResponseDto);
     }
     
+    public Optional<AircraftResponseDto> getAircraftByRegistration(String registration) {
+        return aircraftRepository.findByRegistration(registration)
+                .map(this::convertToResponseDto);
+    }
+    
     public List<AircraftResponseDto> getAircraftByStatus(AircraftStatus status) {
         return aircraftRepository.findByStatus(status).stream()
                 .map(this::convertToResponseDto)
@@ -44,7 +49,12 @@ public class AircraftService {
     }
     
     public AircraftResponseDto createAircraft(AircraftRequestDto requestDto) {
-        Aircraft aircraft = new Aircraft(requestDto.getModel(), requestDto.getStatus(), requestDto.getCapacity());
+        // Check if registration already exists
+        if (aircraftRepository.existsByRegistration(requestDto.getRegistration())) {
+            throw new IllegalArgumentException("Aircraft with registration " + requestDto.getRegistration() + " already exists");
+        }
+        
+        Aircraft aircraft = new Aircraft(requestDto.getRegistration(), requestDto.getModel(), requestDto.getStatus(), requestDto.getCapacity());
         Aircraft savedAircraft = aircraftRepository.save(aircraft);
         return convertToResponseDto(savedAircraft);
     }
@@ -52,6 +62,19 @@ public class AircraftService {
     public Optional<AircraftResponseDto> updateAircraft(Long id, AircraftRequestDto requestDto) {
         return aircraftRepository.findById(id)
                 .map(aircraft -> {
+                    // Don't allow changing registration
+                    aircraft.setModel(requestDto.getModel());
+                    aircraft.setStatus(requestDto.getStatus());
+                    aircraft.setCapacity(requestDto.getCapacity());
+                    Aircraft savedAircraft = aircraftRepository.save(aircraft);
+                    return convertToResponseDto(savedAircraft);
+                });
+    }
+    
+    public Optional<AircraftResponseDto> updateAircraftByRegistration(String registration, AircraftRequestDto requestDto) {
+        return aircraftRepository.findByRegistration(registration)
+                .map(aircraft -> {
+                    // Don't allow changing registration
                     aircraft.setModel(requestDto.getModel());
                     aircraft.setStatus(requestDto.getStatus());
                     aircraft.setCapacity(requestDto.getCapacity());
@@ -116,6 +139,7 @@ public class AircraftService {
     private AircraftResponseDto convertToResponseDto(Aircraft aircraft) {
         AircraftResponseDto responseDto = new AircraftResponseDto();
         responseDto.setId(aircraft.getId());
+        responseDto.setRegistration(aircraft.getRegistration());
         responseDto.setModel(aircraft.getModel());
         responseDto.setStatus(aircraft.getStatus());
         responseDto.setCapacity(aircraft.getCapacity());

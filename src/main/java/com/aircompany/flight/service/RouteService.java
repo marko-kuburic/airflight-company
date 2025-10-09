@@ -3,7 +3,9 @@ package com.aircompany.flight.service;
 import com.aircompany.flight.dto.RouteRequestDto;
 import com.aircompany.flight.dto.RouteResponseDto;
 import com.aircompany.flight.model.Route;
+import com.aircompany.flight.model.Segment;
 import com.aircompany.flight.repository.RouteRepository;
+import com.aircompany.flight.repository.SegmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,9 @@ public class RouteService {
     
     @Autowired
     private RouteRepository routeRepository;
+    
+    @Autowired
+    private SegmentRepository segmentRepository;
     
     public List<RouteResponseDto> getAllRoutes() {
         return routeRepository.findAll().stream()
@@ -56,7 +61,7 @@ public class RouteService {
     }
     
     public RouteResponseDto createRoute(RouteRequestDto requestDto) {
-        Route route = new Route(requestDto.getName(), requestDto.getTotalDistance());
+        Route route = new Route(requestDto.getName(), BigDecimal.ZERO); // Will be calculated from segments
         Route savedRoute = routeRepository.save(route);
         return convertToResponseDto(savedRoute);
     }
@@ -105,9 +110,39 @@ public class RouteService {
         RouteResponseDto responseDto = new RouteResponseDto();
         responseDto.setId(route.getId());
         responseDto.setName(route.getName());
-        responseDto.setTotalDistance(route.getTotalDistance());
+        
+        // Calculate total distance from segments
+        BigDecimal totalDistance = calculateTotalDistanceFromSegments(route);
+        responseDto.setTotalDistance(totalDistance);
+        
         responseDto.setCreatedAt(route.getCreatedAt());
         responseDto.setModifiedAt(route.getModifiedAt());
         return responseDto;
+    }
+    
+    /**
+     * Calculate total distance from all segments of a route
+     */
+    private BigDecimal calculateTotalDistanceFromSegments(Route route) {
+        return route.getSegments().stream()
+                .map(Segment::getDistance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
+    /**
+     * Recalculate and update total distance for a route based on its segments
+     */
+    public void recalculateTotalDistance(Long routeId) {
+        Route route = routeRepository.findById(routeId)
+                .orElseThrow(() -> new IllegalArgumentException("Route with ID " + routeId + " not found"));
+        
+        // Explicitly fetch segments to avoid lazy loading issues
+        List<Segment> segments = segmentRepository.findByRouteId(routeId);
+        BigDecimal totalDistance = segments.stream()
+                .map(Segment::getDistance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        route.setTotalDistance(totalDistance);
+        routeRepository.save(route);
     }
 }

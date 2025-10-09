@@ -148,13 +148,9 @@ public class Maintenance {
     
     // Nested Enums
     public enum ServiceType {
-        MAINTENANCE,
-        CLEANING,
-        FUELING,
-        INSPECTION,
-        REPAIR,
-        OVERHAUL,
-        OTHER
+        SCHEDULED,
+        UNSCHEDULED,
+        INSPECTION
     }
     
     public enum ServiceStatus {

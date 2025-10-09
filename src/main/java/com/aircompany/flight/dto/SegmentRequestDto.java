@@ -14,8 +14,12 @@ public class SegmentRequestDto {
     @NotNull(message = "Destination airport ID is required")
     private Long destinationAirportId;
     
-    @NotNull(message = "Distance is required")
+    // Distance and duration will be calculated automatically from airport coordinates
     private BigDecimal distance;
+    
+    private Integer durationMinutes;
+    
+    private Integer layoverMinutes; // Time to wait at destination before next segment (in minutes)
     
     // Constructors
     public SegmentRequestDto() {}
@@ -25,6 +29,14 @@ public class SegmentRequestDto {
         this.originAirportId = originAirportId;
         this.destinationAirportId = destinationAirportId;
         this.distance = distance;
+    }
+    
+    public SegmentRequestDto(Long routeId, Long originAirportId, Long destinationAirportId, BigDecimal distance, Integer durationMinutes) {
+        this.routeId = routeId;
+        this.originAirportId = originAirportId;
+        this.destinationAirportId = destinationAirportId;
+        this.distance = distance;
+        this.durationMinutes = durationMinutes;
     }
     
     // Getters and Setters
@@ -58,5 +70,21 @@ public class SegmentRequestDto {
     
     public void setDistance(BigDecimal distance) {
         this.distance = distance;
+    }
+    
+    public Integer getDurationMinutes() {
+        return durationMinutes;
+    }
+    
+    public void setDurationMinutes(Integer durationMinutes) {
+        this.durationMinutes = durationMinutes;
+    }
+    
+    public Integer getLayoverMinutes() {
+        return layoverMinutes;
+    }
+    
+    public void setLayoverMinutes(Integer layoverMinutes) {
+        this.layoverMinutes = layoverMinutes;
     }
 }

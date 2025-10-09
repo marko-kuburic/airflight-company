@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api', // Use relative URL to go through nginx proxy
+  baseURL: process.env.REACT_APP_API_BASE_URL || '/api', // Use relative URL to go through nginx proxy
   timeout: 30000, // Increased to 30 seconds for slow analytics queries
   headers: {
     'Content-Type': 'application/json',
@@ -95,9 +95,15 @@ export const flightAPI = {
   // Flight search
   searchFlights: (params) => api.get('/flights/search', { params }),
   getFlightById: (id) => api.get(`/flights/${id}`),
+  getAllFlights: () => api.get('/flights/management/all'),
+
+  // Flight management
+  createFlight: (data) => api.post('/flights', data),
+  updateFlight: (id, data) => api.put(`/flights/${id}`, data),
+  deleteFlight: (id) => api.delete(`/flights/${id}`),
   
   // Airports
-  getAirports: () => api.get('/flights/airports'),
+  getAirports: () => api.get('/flight/airports'),
   getDestinationsFromOrigin: (origin) => api.get('/flights/destinations', { params: { origin } }),
   getOriginsToDestination: (destination) => api.get('/flights/origins', { params: { destination } }),
   
@@ -161,6 +167,82 @@ export const loyaltyAPI = {
   deductPoints: (customerId, points) => api.delete(`/loyalty/customers/${customerId}/points`, { data: { points } }),
 };
 
+export const aircraftAPI = {
+  // Aircraft management
+  getAllAircraft: () => api.get('/flight/aircraft'),
+  getAircraftById: (id) => api.get(`/flight/aircraft/${id}`),
+  getAircraftByRegistration: (registration) => api.get(`/flight/aircraft/registration/${registration}`),
+  getAircraftByStatus: (status) => api.get(`/flight/aircraft/status/${status}`),
+  searchAircraftByModel: (model) => api.get('/flight/aircraft/search/model', { params: { model } }),
+  getAircraftByCapacityRange: (minCapacity, maxCapacity) => 
+    api.get('/flight/aircraft/capacity/range', { params: { minCapacity, maxCapacity } }),
+  getAircraftByMinCapacity: (minCapacity) => api.get(`/flight/aircraft/capacity/min/${minCapacity}`),
+  getAircraftWithService: (id) => api.get(`/flight/aircraft/${id}/with-service`),
+  getAircraftWithFlights: (id) => api.get(`/flight/aircraft/${id}/with-flights`),
+  getAircraftCountByStatus: (status) => api.get(`/flight/aircraft/count/status/${status}`),
+  
+  // Aircraft CRUD operations
+  createAircraft: (data) => api.post('/flight/aircraft', data),
+  updateAircraft: (id, data) => api.put(`/flight/aircraft/${id}`, data),
+  updateAircraftByRegistration: (registration, data) => api.put(`/flight/aircraft/registration/${registration}`, data),
+  updateAircraftStatus: (id, status) => api.patch(`/flight/aircraft/${id}/status`, null, { params: { status } }),
+  deleteAircraft: (id) => api.delete(`/flight/aircraft/${id}`),
+};
+
+export const maintenanceAPI = {
+  // Maintenance services
+  getAllServices: () => api.get('/flight/services'),
+  getServiceById: (id) => api.get(`/flight/services/${id}`),
+  getServicesByAircraft: (aircraftId) => api.get(`/flight/services/aircraft/${aircraftId}`),
+  getServicesByTechnician: (technicianId) => api.get(`/flight/services/technician/${technicianId}`),
+  getServicesByStatus: (status) => api.get(`/flight/services/status/${status}`),
+  getServicesByType: (serviceType) => api.get(`/flight/services/type/${serviceType}`),
+  
+  // Service CRUD operations
+  createService: (data) => api.post('/flight/services', data),
+  updateService: (id, data) => api.put(`/flight/services/${id}`, data),
+  updateServiceStatus: (id, status) => api.patch(`/flight/services/${id}/status`, null, { params: { status } }),
+  deleteService: (id) => api.delete(`/flight/services/${id}`),
+};
+
+export const routeAPI = {
+  // Route management
+  getAllRoutes: () => api.get('/flight/routes'),
+  getRouteById: (id) => api.get(`/flight/routes/${id}`),
+  getRouteWithSegments: (id) => api.get(`/flight/routes/${id}/with-segments`),
+  getRouteWithFlights: (id) => api.get(`/flight/routes/${id}/with-flights`),
+  searchRoutesByName: (name) => api.get('/flight/routes/search/name', { params: { name } }),
+  getRoutesByDistanceRange: (minDistance, maxDistance) => 
+    api.get('/flight/routes/distance/range', { params: { minDistance, maxDistance } }),
+  getRoutesByMinDistance: (minDistance) => api.get(`/flight/routes/distance/min/${minDistance}`),
+  getRoutesByMaxDistance: (maxDistance) => api.get(`/flight/routes/distance/max/${maxDistance}`),
+  getTotalRouteCount: () => api.get('/flight/routes/count'),
+  
+  // Route CRUD operations
+  createRoute: (data) => api.post('/flight/routes', data),
+  updateRoute: (id, data) => api.put(`/flight/routes/${id}`, data),
+  deleteRoute: (id) => api.delete(`/flight/routes/${id}`),
+  recalculateTotalDistance: (id) => api.post(`/flight/routes/${id}/recalculate-distance`),
+};
+
+export const segmentAPI = {
+  // Segment management
+  getAllSegments: () => api.get('/flight/segments'),
+  getSegmentById: (id) => api.get(`/flight/segments/${id}`),
+  getSegmentsByRoute: (routeId) => api.get(`/flight/segments/route/${routeId}`),
+  getSegmentsByRouteOrdered: (routeId) => api.get(`/flight/segments/route/${routeId}/ordered`),
+  getSegmentsByOriginAirport: (originAirportId) => api.get(`/flight/segments/origin/${originAirportId}`),
+  getSegmentsByDestinationAirport: (destinationAirportId) => api.get(`/flight/segments/destination/${destinationAirportId}`),
+  getSegmentsByDistanceRange: (minDistance, maxDistance) => 
+    api.get('/flight/segments/distance/range', { params: { minDistance, maxDistance } }),
+  getSegmentsByOriginAndDestination: (originId, destinationId) =>
+    api.get(`/flight/segments/origin/${originId}/destination/${destinationId}`),
+  
+  // Segment CRUD operations
+  createSegment: (data) => api.post('/flight/segments', data),
+  updateSegment: (id, data) => api.put(`/flight/segments/${id}`, data),
+  deleteSegment: (id) => api.delete(`/flight/segments/${id}`),
+};
 export const analyticsAPI = {
   getDashboardSummary: () => api.get('/analytics/dashboard'),
   getFinancialIndicators: (flightId, startDate, endDate) => 
@@ -205,6 +287,17 @@ export const downloadTicket = async (ticketId) => {
   } catch (error) {
     handleApiError(error);
   }
+};
+
+export const reportsAPI = {
+  // Get all reports
+  getAllReports: (startDate, endDate) => api.get('/reports/all', { params: { startDate, endDate } }),
+  
+  // Individual reports
+  getFlightsPerAircraftRoute: (startDate, endDate) => api.get('/reports/flights-per-aircraft-route', { params: { startDate, endDate } }),
+  getFlightStatuses: (startDate, endDate) => api.get('/reports/flight-statuses', { params: { startDate, endDate } }),
+  getAvgTimeBetweenServices: () => api.get('/reports/avg-time-between-services'),
+  getPlanChangeFrequency: () => api.get('/reports/plan-change-frequency'),
 };
 
 export default api;

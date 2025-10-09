@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authAPI, bookingAPI } from '../services/api';
+import { Layout } from '../components/Layout';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
@@ -58,56 +59,41 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#EEF4FB" }}>
-      {/* Header */}
-      <div 
-        className="bg-white shadow-sm px-6 py-4"
-        style={{ borderBottom: "1px solid #D9E1EA" }}
-      >
-        <div className="flex justify-between items-center max-w-6xl mx-auto">
-          <h1 
-            style={{
-              fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
-              fontSize: "24px",
-              fontWeight: 700,
-              color: "#2F3E4D"
-            }}
-          >
-            Air Company Dashboard
-          </h1>
-          
-          <div className="flex items-center gap-4">
-            <span 
+    <Layout>
+      <div className="min-h-screen" style={{ backgroundColor: "#EEF4FB" }}>
+        {/* Header */}
+        <div 
+          className="bg-white shadow-sm px-6 py-4"
+          style={{ borderBottom: "1px solid #D9E1EA" }}
+        >
+          <div className="flex justify-between items-center max-w-6xl mx-auto">
+            <h1 
               style={{
                 fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
-                fontSize: "14px",
-                color: "#738396"
+                fontSize: "24px",
+                fontWeight: 700,
+                color: "#2F3E4D"
               }}
             >
-              Welcome, {user?.firstName}!
-            </span>
+              Air Company Dashboard
+            </h1>
             
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
-              style={{
-                backgroundColor: "#3F8EFC",
-                fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#FFFFFF",
-                border: "none",
-                cursor: "pointer"
-              }}
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-4">
+              <span 
+                style={{
+                  fontFamily: "Inter, -apple-system, Roboto, Helvetica, sans-serif",
+                  fontSize: "14px",
+                  color: "#738396"
+                }}
+              >
+                Welcome, {user?.firstName}!
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto p-6">
+        {/* Main Content */}
+        <div className="max-w-6xl mx-auto p-6">
         {/* User Info Card */}
         <div 
           className="bg-white rounded-lg p-6 mb-6 shadow-sm"
@@ -329,7 +315,8 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

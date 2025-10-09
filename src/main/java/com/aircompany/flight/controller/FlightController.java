@@ -80,24 +80,24 @@ public class FlightController {
     }
     
     @PostMapping
-    public ResponseEntity<FlightResponseDto> createFlight(@Valid @RequestBody FlightRequestDto requestDto) {
+    public ResponseEntity<?> createFlight(@Valid @RequestBody FlightRequestDto requestDto) {
         try {
             FlightResponseDto createdFlight = flightService.createFlight(requestDto);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdFlight);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
         }
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<FlightResponseDto> updateFlight(@PathVariable Long id, 
+    public ResponseEntity<?> updateFlight(@PathVariable Long id, 
                                                        @Valid @RequestBody FlightRequestDto requestDto) {
         try {
             Optional<FlightResponseDto> updatedFlight = flightService.updateFlight(id, requestDto);
             return updatedFlight.map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
         }
     }
     
@@ -243,6 +243,65 @@ public class FlightController {
             ));
         } catch (Exception e) {
             logger.error("Error getting all flights: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error getting flights: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Get all flights with full details (for dispatcher management)
+     */
+    @GetMapping("/management/all")
+    public ResponseEntity<?> getAllFlightsForManagement() {
+        try {
+            List<Flight> flights = flightService.getAllFlights();
+            
+            // Convert to map with all details, handling lazy loading carefully
+            List<Map<String, Object>> detailedFlights = flights.stream()
+                .map(flight -> {
+                    Map<String, Object> flightMap = new HashMap<>();
+                    flightMap.put("id", flight.getId());
+                    flightMap.put("flightNumber", flight.getFlightNumber());
+                    flightMap.put("departureTime", flight.getDepTime());
+                    flightMap.put("arrivalTime", flight.getArrTime());
+                    flightMap.put("status", flight.getStatus());
+                    
+                    // Safely add related entity IDs
+                    try {
+                        if (flight.getRoute() != null) {
+                            flightMap.put("routeId", flight.getRoute().getId());
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not load route for flight {}", flight.getId());
+                    }
+                    
+                    try {
+                        if (flight.getAircraft() != null) {
+                            flightMap.put("aircraftId", flight.getAircraft().getId());
+                            flightMap.put("aircraftModel", flight.getAircraft().getModel());
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not load aircraft for flight {}", flight.getId());
+                    }
+                    
+                    try {
+                        if (flight.getFlightDispatcher() != null) {
+                            flightMap.put("flightDispatcherId", flight.getFlightDispatcher().getId());
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not load dispatcher for flight {}", flight.getId());
+                    }
+                    
+                    return flightMap;
+                })
+                .collect(Collectors.toList());
+            
+            logger.info("Management: Found {} total flights in database", flights.size());
+            return ResponseEntity.ok(Map.of(
+                "totalFlights", flights.size(),
+                "flights", detailedFlights
+            ));
+        } catch (Exception e) {
+            logger.error("Error getting all flights for management: {}", e.getMessage());
             return ResponseEntity.badRequest().body(createErrorResponse("Error getting flights: " + e.getMessage()));
         }
     }
