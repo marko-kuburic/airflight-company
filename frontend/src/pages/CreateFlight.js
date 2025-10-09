@@ -21,9 +21,16 @@ export default function CreateFlight() {
     flightNumber: generateDefaultFlightNumber(),
     routeId: '',
     departureDate: '',
-    arrivalDate: '',
+    departureTime: '12:00',
     status: 'SCHEDULED',
     aircraftId: ''
+  });
+
+  // Calculated arrival date/time based on route segments
+  const [calculatedArrival, setCalculatedArrival] = useState({
+    date: '',
+    time: '',
+    dateTime: ''
   });
 
   // Data state
@@ -87,30 +94,82 @@ export default function CreateFlight() {
     }
   }, [formData.routeId, routes]);
 
+  // Calculate arrival time whenever departure date/time or route changes
+  useEffect(() => {
+    if (formData.departureDate && formData.departureTime && selectedRoute) {
+      const arrival = calculateArrivalTime(formData.departureDate, formData.departureTime, selectedRoute);
+      setCalculatedArrival(arrival);
+    } else {
+      setCalculatedArrival({ date: '', time: '', dateTime: '' });
+    }
+  }, [formData.departureDate, formData.departureTime, selectedRoute]);
+
+  const calculateArrivalTime = (departureDate, departureTime, route) => {
+    if (!departureDate || !departureTime || !route || !route.segments || route.segments.length === 0) {
+      return { date: '', time: '', dateTime: '' };
+    }
+
+    try {
+      // Calculate total route duration from segments (durationMinutes + layoverMinutes)
+      let totalDurationMinutes = 0;
+      route.segments.forEach(segment => {
+        if (segment.durationMinutes) {
+          totalDurationMinutes += segment.durationMinutes;
+        }
+        // Add layover time (waiting time at destination before next segment)
+        if (segment.layoverMinutes) {
+          totalDurationMinutes += segment.layoverMinutes;
+        }
+      });
+
+      // If no valid segments, return empty
+      if (totalDurationMinutes === 0) {
+        return { date: '', time: '', dateTime: '' };
+      }
+
+      // Calculate arrival datetime
+      const departureDateTime = new Date(`${departureDate}T${departureTime}`);
+      const arrivalDateTime = new Date(departureDateTime.getTime() + totalDurationMinutes * 60 * 1000);
+
+      const arrivalDate = arrivalDateTime.toISOString().split('T')[0];
+      const arrivalTime = arrivalDateTime.toTimeString().substring(0, 5);
+      const arrivalDateTimeStr = `${arrivalDate}T${arrivalTime}:00`;
+
+      return {
+        date: arrivalDate,
+        time: arrivalTime,
+        dateTime: arrivalDateTimeStr
+      };
+    } catch (error) {
+      console.error('Error calculating arrival time:', error);
+      return { date: '', time: '', dateTime: '' };
+    }
+  };
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Clear aircraft availability when route or dates change
-    if (field === 'routeId' || field === 'departureDate' || field === 'arrivalDate') {
+    // Clear aircraft availability when route or dates/times change
+    if (field === 'routeId' || field === 'departureDate' || field === 'departureTime') {
       setAircraftAvailability(null);
     }
   };
 
   const checkAircraftAvailability = async () => {
-    if (!formData.aircraftId || !formData.departureDate || !formData.arrivalDate) {
-      toast.error('Please select aircraft and dates first');
+    if (!formData.aircraftId || !formData.departureDate || !calculatedArrival.dateTime) {
+      toast.error('Please select aircraft, departure date/time, and route first');
       return;
     }
 
     try {
       setLoading(true);
       
-      // Convert dates to LocalDateTime format (add default times)
-      const departureDateTime = `${formData.departureDate}T00:00:00`;
-      const arrivalDateTime = `${formData.arrivalDate}T23:59:59`;
+      // Use actual departure and calculated arrival times
+      const departureDateTime = `${formData.departureDate}T${formData.departureTime}:00`;
+      const arrivalDateTime = calculatedArrival.dateTime;
 
       // Check for maintenance conflicts
       const maintenanceResponse = await maintenanceAPI.getServicesByAircraft(formData.aircraftId);
@@ -165,18 +224,18 @@ export default function CreateFlight() {
       return;
     }
 
-    if (!formData.departureDate || !formData.arrivalDate) {
-      toast.error('Please select departure and arrival dates');
+    if (!formData.departureDate || !formData.departureTime) {
+      toast.error('Please select departure date and time');
+      return;
+    }
+
+    if (!calculatedArrival.dateTime) {
+      toast.error('Arrival time could not be calculated. Please check route segments');
       return;
     }
 
     if (!formData.aircraftId) {
       toast.error('Please select an aircraft');
-      return;
-    }
-
-    if (new Date(formData.departureDate) >= new Date(formData.arrivalDate)) {
-      toast.error('Arrival date must be after departure date');
       return;
     }
 
@@ -193,17 +252,8 @@ export default function CreateFlight() {
 
     setIsSubmitting(true);
     try {
-      // Get selected route to extract time information
-      const selectedRouteData = routes.find(r => r.id === parseInt(formData.routeId));
-      if (!selectedRouteData) {
-        toast.error('Selected route not found');
-        return;
-      }
-
-      // For now, we'll use the first and last segments for times
-      // In a real implementation, you'd calculate this based on route segments
-      const departureDateTime = `${formData.departureDate}T12:00:00`; // Default time
-      const arrivalDateTime = `${formData.arrivalDate}T13:25:00`; // Default time
+      const departureDateTime = `${formData.departureDate}T${formData.departureTime}:00`;
+      const arrivalDateTime = calculatedArrival.dateTime;
 
       const flightData = {
         flightNumber: formData.flightNumber,
@@ -213,6 +263,8 @@ export default function CreateFlight() {
         aircraftId: parseInt(formData.aircraftId),
         routeId: parseInt(formData.routeId)
       };
+
+      console.log('Creating flight with data:', flightData);
 
       // Make API call to create flight
       const response = await flightAPI.createFlight(flightData);
@@ -241,6 +293,13 @@ export default function CreateFlight() {
     const lastDestination = segments[segments.length - 1].destinationAirportCode || 'N/A';
     
     return originCodes.concat([lastDestination]).join(' → ');
+  };
+
+  const formatDuration = (minutes) => {
+    if (!minutes || minutes === 0) return '0m';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
   if (loading && routes.length === 0) {
@@ -410,7 +469,7 @@ export default function CreateFlight() {
                 />
               </div>
 
-              {/* Arrival Date */}
+              {/* Departure Time */}
               <div>
                 <label style={{
                   display: 'block',
@@ -420,12 +479,12 @@ export default function CreateFlight() {
                   marginBottom: '4px',
                   fontFamily: 'Inter, sans-serif'
                 }}>
-                  Arrival Date
+                  Departure Time
                 </label>
                 <input
-                  type="date"
-                  value={formData.arrivalDate}
-                  onChange={(e) => handleInputChange('arrivalDate', e.target.value)}
+                  type="time"
+                  value={formData.departureTime}
+                  onChange={(e) => handleInputChange('departureTime', e.target.value)}
                   style={{
                     width: '100%',
                     height: '40px',
@@ -436,6 +495,37 @@ export default function CreateFlight() {
                     fontFamily: 'Inter, sans-serif'
                   }}
                 />
+              </div>
+
+              {/* Calculated Arrival (Read-only display) */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: '#4A5568',
+                  marginBottom: '4px',
+                  fontFamily: 'Inter, sans-serif'
+                }}>
+                  Calculated Arrival
+                </label>
+                <div style={{
+                  width: '100%',
+                  height: '40px',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontFamily: 'Inter, sans-serif',
+                  backgroundColor: '#F9FAFB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: calculatedArrival.dateTime ? '#1F2937' : '#9CA3AF'
+                }}>
+                  {calculatedArrival.dateTime 
+                    ? `${calculatedArrival.date} at ${calculatedArrival.time}` 
+                    : 'Select route and departure to calculate'}
+                </div>
               </div>
 
             </div>
@@ -478,7 +568,7 @@ export default function CreateFlight() {
                   </select>
                   <button
                     onClick={checkAircraftAvailability}
-                    disabled={loading || !formData.aircraftId || !formData.departureDate || !formData.arrivalDate}
+                    disabled={loading || !formData.aircraftId || !formData.departureDate || !calculatedArrival.dateTime}
                     style={{
                       height: '40px',
                       padding: '0 12px',
@@ -488,12 +578,12 @@ export default function CreateFlight() {
                       borderRadius: '6px',
                       fontSize: '12px',
                       fontWeight: '500',
-                      cursor: (loading || !formData.aircraftId || !formData.departureDate || !formData.arrivalDate) ? 'not-allowed' : 'pointer',
+                      cursor: (loading || !formData.aircraftId || !formData.departureDate || !calculatedArrival.dateTime) ? 'not-allowed' : 'pointer',
                       fontFamily: 'Inter, sans-serif',
-                      opacity: (loading || !formData.aircraftId || !formData.departureDate || !formData.arrivalDate) ? 0.6 : 1
+                      opacity: (loading || !formData.aircraftId || !formData.departureDate || !calculatedArrival.dateTime) ? 0.6 : 1
                     }}
                   >
-                    Available
+                    Check Availability
                   </button>
                 </div>
                 
@@ -570,7 +660,7 @@ export default function CreateFlight() {
                             fontWeight: '600',
                             color: '#4A5568',
                             borderBottom: '1px solid #E2E8F0'
-                          }}>Dep</th>
+                          }}>Duration</th>
                           <th style={{
                             padding: '8px',
                             textAlign: 'left',
@@ -578,7 +668,7 @@ export default function CreateFlight() {
                             fontWeight: '600',
                             color: '#4A5568',
                             borderBottom: '1px solid #E2E8F0'
-                          }}>Arr</th>
+                          }}>Layover</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -607,13 +697,13 @@ export default function CreateFlight() {
                               fontSize: '12px',
                               color: '#2D3748',
                               borderBottom: '1px solid #E2E8F0'
-                            }}>{segment.departureTime ? (typeof segment.departureTime === 'string' ? segment.departureTime.substring(0, 5) : segment.departureTime) : 'N/A'}</td>
+                            }}>{formatDuration(segment.durationMinutes || 0)}</td>
                             <td style={{
                               padding: '8px',
                               fontSize: '12px',
                               color: '#2D3748',
                               borderBottom: '1px solid #E2E8F0'
-                            }}>{segment.arrivalTime ? (typeof segment.arrivalTime === 'string' ? segment.arrivalTime.substring(0, 5) : segment.arrivalTime) : 'N/A'}</td>
+                            }}>{index === 0 ? 'N/A' : formatDuration(segment.layoverMinutes || 0)}</td>
                           </tr>
                         ))}
                       </tbody>
