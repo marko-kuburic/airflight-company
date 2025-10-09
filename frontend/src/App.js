@@ -24,6 +24,7 @@ import DispatcherMaintenance from './pages/DispatcherMaintenance';
 import CreateFlight from './pages/CreateFlight';
 import EditFlight from './pages/EditFlight';
 import Flights from './pages/Flights';
+import Reports from './pages/Reports';
 import AdminLogin from './pages/AdminLogin';
 import CustomerManagement from './pages/CustomerManagement';
 import { Sidebar } from './components/Sidebar';
@@ -58,6 +59,7 @@ function App() {
           <Route path="/dispatcher/routes" element={<RoutesList />} />
           <Route path="/dispatcher/routes/add" element={<AddRoute />} />
           <Route path="/dispatcher/maintenance" element={<DispatcherMaintenance />} />
+          <Route path="/dispatcher/reports" element={<Reports />} />
           
           {/* Technician Routes */}
           <Route path="/technician/records" element={<ServiceRecords />} />
