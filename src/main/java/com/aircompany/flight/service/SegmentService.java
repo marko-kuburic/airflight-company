@@ -85,13 +85,18 @@ public class SegmentService {
             destinationAirport.getLatitude(), destinationAirport.getLongitude()
         );
         
+        // Calculate duration based on distance
+        int durationMinutes = com.aircompany.flight.util.DistanceCalculator.calculateDurationMinutes(
+            calculatedDistance.doubleValue()
+        );
+        
         Segment segment = new Segment();
         segment.setRoute(route);
         segment.setOriginAirport(originAirport);
         segment.setDestinationAirport(destinationAirport);
         segment.setDistance(calculatedDistance);
-        segment.setDepartureTime(requestDto.getDepartureTime());
-        segment.setArrivalTime(requestDto.getArrivalTime());
+        segment.setDurationMinutes(durationMinutes);
+        segment.setLayoverMinutes(requestDto.getLayoverMinutes() != null ? requestDto.getLayoverMinutes() : 0);
         
         Segment savedSegment = segmentRepository.save(segment);
         
@@ -110,12 +115,22 @@ public class SegmentService {
                     Airport destinationAirport = airportRepository.findById(requestDto.getDestinationAirportId())
                             .orElseThrow(() -> new IllegalArgumentException("Destination airport with ID " + requestDto.getDestinationAirportId() + " not found"));
                     
+                    // Recalculate distance and duration
+                    BigDecimal calculatedDistance = calculateDistance(
+                        originAirport.getLatitude(), originAirport.getLongitude(),
+                        destinationAirport.getLatitude(), destinationAirport.getLongitude()
+                    );
+                    
+                    int durationMinutes = com.aircompany.flight.util.DistanceCalculator.calculateDurationMinutes(
+                        calculatedDistance.doubleValue()
+                    );
+                    
                     segment.setRoute(route);
                     segment.setOriginAirport(originAirport);
                     segment.setDestinationAirport(destinationAirport);
-                    segment.setDistance(requestDto.getDistance());
-                    segment.setDepartureTime(requestDto.getDepartureTime());
-                    segment.setArrivalTime(requestDto.getArrivalTime());
+                    segment.setDistance(calculatedDistance);
+                    segment.setDurationMinutes(durationMinutes);
+                    segment.setLayoverMinutes(requestDto.getLayoverMinutes() != null ? requestDto.getLayoverMinutes() : 0);
                     
                     Segment savedSegment = segmentRepository.save(segment);
                     return convertToResponseDto(savedSegment);
@@ -154,8 +169,8 @@ public class SegmentService {
         responseDto.setDestinationAirportCode(segment.getDestinationAirport().getIataCode());
         responseDto.setDestinationAirportName(segment.getDestinationAirport().getName());
         responseDto.setDistance(segment.getDistance());
-        responseDto.setDepartureTime(segment.getDepartureTime());
-        responseDto.setArrivalTime(segment.getArrivalTime());
+        responseDto.setDurationMinutes(segment.getDurationMinutes());
+        responseDto.setLayoverMinutes(segment.getLayoverMinutes());
         responseDto.setCreatedAt(segment.getCreatedAt());
         responseDto.setModifiedAt(segment.getModifiedAt());
         return responseDto;

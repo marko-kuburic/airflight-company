@@ -8,7 +8,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 @Entity
 @Table(name = "segments")
@@ -26,11 +25,8 @@ public class Segment {
     @Column(name = "duration_minutes")
     private Integer durationMinutes;
     
-    @Column(name = "departure_time")
-    private LocalTime departureTime;
-    
-    @Column(name = "arrival_time")
-    private LocalTime arrivalTime;
+    @Column(name = "layover_minutes")
+    private Integer layoverMinutes; // Time to wait at destination airport before next segment
     
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -62,13 +58,13 @@ public class Segment {
         this.route = route;
     }
     
-    public Segment(Airport originAirport, Airport destinationAirport, BigDecimal distance, Route route, LocalTime departureTime, LocalTime arrivalTime) {
+    public Segment(Airport originAirport, Airport destinationAirport, BigDecimal distance, Integer durationMinutes, Route route) {
         this.originAirport = originAirport;
         this.destinationAirport = destinationAirport;
         this.distance = distance;
+        this.durationMinutes = durationMinutes;
+        this.layoverMinutes = 0; // Default to 0, can be set later
         this.route = route;
-        this.departureTime = departureTime;
-        this.arrivalTime = arrivalTime;
     }
     
     // Getters and Setters
@@ -97,20 +93,12 @@ public class Segment {
         this.durationMinutes = durationMinutes;
     }
     
-    public LocalTime getDepartureTime() {
-        return departureTime;
+    public Integer getLayoverMinutes() {
+        return layoverMinutes;
     }
     
-    public void setDepartureTime(LocalTime departureTime) {
-        this.departureTime = departureTime;
-    }
-    
-    public LocalTime getArrivalTime() {
-        return arrivalTime;
-    }
-    
-    public void setArrivalTime(LocalTime arrivalTime) {
-        this.arrivalTime = arrivalTime;
+    public void setLayoverMinutes(Integer layoverMinutes) {
+        this.layoverMinutes = layoverMinutes;
     }
     
     public LocalDateTime getCreatedAt() {

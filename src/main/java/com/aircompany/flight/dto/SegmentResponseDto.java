@@ -2,7 +2,6 @@ package com.aircompany.flight.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 public class SegmentResponseDto {
     
@@ -16,8 +15,8 @@ public class SegmentResponseDto {
     private String destinationAirportCode;
     private String destinationAirportName;
     private BigDecimal distance;
-    private LocalTime departureTime;
-    private LocalTime arrivalTime;
+    private Integer durationMinutes;
+    private Integer layoverMinutes; // Time to wait at destination before next segment
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
     
@@ -32,14 +31,13 @@ public class SegmentResponseDto {
         this.distance = distance;
     }
     
-    public SegmentResponseDto(Long id, Long routeId, Long originAirportId, Long destinationAirportId, BigDecimal distance, LocalTime departureTime, LocalTime arrivalTime) {
+    public SegmentResponseDto(Long id, Long routeId, Long originAirportId, Long destinationAirportId, BigDecimal distance, Integer durationMinutes) {
         this.id = id;
         this.routeId = routeId;
         this.originAirportId = originAirportId;
         this.destinationAirportId = destinationAirportId;
         this.distance = distance;
-        this.departureTime = departureTime;
-        this.arrivalTime = arrivalTime;
+        this.durationMinutes = durationMinutes;
     }
     
     // Getters and Setters
@@ -123,20 +121,20 @@ public class SegmentResponseDto {
         this.distance = distance;
     }
     
-    public LocalTime getDepartureTime() {
-        return departureTime;
+    public Integer getDurationMinutes() {
+        return durationMinutes;
     }
     
-    public void setDepartureTime(LocalTime departureTime) {
-        this.departureTime = departureTime;
+    public void setDurationMinutes(Integer durationMinutes) {
+        this.durationMinutes = durationMinutes;
     }
     
-    public LocalTime getArrivalTime() {
-        return arrivalTime;
+    public Integer getLayoverMinutes() {
+        return layoverMinutes;
     }
     
-    public void setArrivalTime(LocalTime arrivalTime) {
-        this.arrivalTime = arrivalTime;
+    public void setLayoverMinutes(Integer layoverMinutes) {
+        this.layoverMinutes = layoverMinutes;
     }
     
     public LocalDateTime getCreatedAt() {
